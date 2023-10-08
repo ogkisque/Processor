@@ -1,8 +1,5 @@
 #include "stack.h"
 
-#define STACK_DUMP(stk, error) \
-        stack_dump (stk, error, __FILE__, __func__, __LINE__);
-
 struct Stack
 {
 #ifdef CANARY
@@ -24,24 +21,12 @@ struct Stack
 #endif
 };
 
-int stack_verify (Stack* stk);
-int stack_ctor (Stack* stk, const char* name, const char* file, const char* func, int line);
-int stack_dtor (Stack* stk);
-void print_error (int error);
-void stack_dump (const Stack* stk, int error, const char* file, const char* func, int line);
-bool need_realloc (const Stack* stk);
-int stack_realloc (Stack* stk, Actions action);
-Elemt* get_elem_point (const Stack* stk, int num);
-#ifdef HASH
-Hasht get_hash (const Stack* stk);
-#endif
-
 int make_stack (Stack** stk, const char* name, const char* file, const char* func, int line)
 {
     int error = 0;
     if (stk == NULL)
     {
-        error |= MEM_ALLOC_ERR;
+        error |= NULL_POINTER;
         return error;
     }
 

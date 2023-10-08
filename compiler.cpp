@@ -1,26 +1,62 @@
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
+
+#include "commands.h"
 
 enum Errors
 {
     CORRECT =      -1,
     OPEN_FILE_ERR = 1,
-    SYNTAX_ERR    = 2
+    SYNTAX_ERR    = 2,
+    MEM_ALLOC_ERR = 3
 };
 
 const int MAX_COMMAND_LEN = 20;
-const char* FILE_NAME_READ = "asm.txt";
-const char* FILE_NAME_PRINT = "byte_code.txt";
+const int REALLOC_STEP = 10;
+const char* FILE_NAME_READ_DEF = "asm.txt";
+const char* FILE_NAME_PRINT_DEF = "byte_code.txt";
+const int MAX_NAME_LEN = 40;
+const char* SIGNATURE = "MEGERA";
+const int VERSION = 1;
 
-Errors compiling (const char* name_file_read, const char* name_file_print);
+Errors get_commands_arr (const char* name_file_read, int** commands_int, int* num_com);
+Errors print_commands_arr (const char* name_file_print, int* commands_int, int num_commands);
 void print_error (Errors error);
+void del_comment (char* str);
+void del_slash_n (char* str);
+bool is_number (char* str);
 
-int main ()
+int main (int argc, char* argv[])
 {
-    Errors error = compiling (FILE_NAME_READ, FILE_NAME_PRINT);
-    print_error (error);
+    char file_name_read[MAX_NAME_LEN] = "";
+    char file_name_print[MAX_NAME_LEN] = "";
+    if (argc < 3)
+    {
+        strcpy (file_name_read, FILE_NAME_READ_DEF);
+        strcpy (file_name_print, FILE_NAME_PRINT_DEF);
+    }
+    else
+    {
+        strcpy (file_name_read, argv[1]);
+        strcpy (file_name_print, argv[2]);
+    }
+
+    int* commands_int;
+    int num_commands = 0;
+    Errors error = get_commands_arr (file_name_read, &commands_int, &num_commands);
     if (error != CORRECT)
+    {
+        print_error (error);
         return 1;
+    }
+
+    error = print_commands_arr (file_name_print, commands_int, num_commands);
+    if (error != CORRECT)
+    {
+        print_error (error);
+        return 1;
+    }
     return 0;
 }
 
@@ -34,6 +70,9 @@ void print_error (Errors error)
     case SYNTAX_ERR:
         printf ("Error is in syntax\n");
         break;
+    case MEM_ALLOC_ERR:
+        printf ("Error is in allocation of memory\n");
+        break;
     case CORRECT:
         printf ("Correct compilation\n");
         break;
@@ -42,78 +81,186 @@ void print_error (Errors error)
     }
 }
 
-Errors compiling (const char* name_file_read, const char* name_file_print)
+Errors get_commands_arr (const char* name_file_read, int** commands_int, int* num_com)
 {
     FILE* file_read = fopen (name_file_read, "r");
-    FILE* file_print = fopen (name_file_print, "w");
-    if (!(file_read && file_print))
+    if (!file_read)
         return OPEN_FILE_ERR;
 
     char command[MAX_COMMAND_LEN] = "";
+    char str[MAX_COMMAND_LEN] = "";
     int number = 0;
-    while (true)
+    int num_commands = 0;
+    int size_arr = REALLOC_STEP;
+    (*commands_int) = (int*) calloc (REALLOC_STEP, sizeof (int));
+    if (!(*commands_int))
+        return MEM_ALLOC_ERR;
+
+    while (fgets (str, MAX_COMMAND_LEN, file_read))
     {
-        if (fscanf (file_read, "%s", command) != 1)
+        del_comment (str);
+        del_slash_n (str);
+        num_commands += 2;
+        if (num_commands == size_arr)
         {
-            break;
+            size_arr += REALLOC_STEP;
+            (*commands_int) = (int*) realloc ((*commands_int), size_arr * sizeof (int));
+            if (!(*commands_int))
+                return MEM_ALLOC_ERR;
         }
-        else
+
+        if (strcmp (str, "hlt") == 0)
         {
-            if (strcmp (command, "HLT") == 0)
+            (*commands_int)[num_commands - 2] = HLT;
+            num_commands--;
+        }
+        else if (strcmp (str, "out") == 0)
+        {
+            (*commands_int)[num_commands - 2] = OUT;
+            num_commands--;
+        }
+        else if (strcmp (str, "in") == 0)
+        {
+            (*commands_int)[num_commands - 2] = IN;
+            num_commands--;
+        }
+        else if (strcmp (str, "div") == 0)
+        {
+            (*commands_int)[num_commands - 2] = DIV;
+            num_commands--;
+        }
+        else if (strcmp (str, "sub") == 0)
+        {
+            (*commands_int)[num_commands - 2] = SUB;
+            num_commands--;
+        }
+        else if (strcmp (str, "mul") == 0)
+        {
+            (*commands_int)[num_commands - 2] = MUL;
+            num_commands--;
+        }
+        else if (strcmp (str, "add") == 0)
+        {
+            (*commands_int)[num_commands - 2] = ADD;
+            num_commands--;
+        }
+        else if (strcmp (str, "sqrt") == 0)
+        {
+            (*commands_int)[num_commands - 2] = SQRT;
+            num_commands--;
+        }
+        else if (strcmp (str, "sin") == 0)
+        {
+            (*commands_int)[num_commands - 2] = SIN;
+            num_commands--;
+        }
+        else if (strcmp (str, "cos") == 0)
+        {
+            (*commands_int)[num_commands - 2] = COS;
+            num_commands--;
+        }
+        else if (strncmp (str, "push", 4) == 0)
+        {
+            (*commands_int)[num_commands - 2] = 0;
+            (*commands_int)[num_commands - 1] = 0;
+            (*commands_int)[num_commands - 2] |= PUSH;
+            if (sscanf (str + 5, "%s", command) != 1)
+                return SYNTAX_ERR;
+
+            if (strlen (command) == 3)
             {
-                fprintf (file_print, "%d\n", -1);
+                if (command[0] == 'r' && command[2] == 'x' && command[1] >= 'a' && command[1] <= 'd')
+                {
+                    (*commands_int)[num_commands - 2] |= BIT_REGISTER;
+                    (*commands_int)[num_commands - 1] = (int) (command[1] - 'a' + 1);
+                }
             }
-            else if (strcmp (command, "OUT") == 0)
+            else if (is_number (command))
             {
-                fprintf (file_print, "%d\n", 9);
-            }
-            else if (strcmp (command, "IN") == 0)
-            {
-                fprintf (file_print, "%d\n", 10);
-            }
-            else if (strcmp (command, "DIV") == 0)
-            {
-                fprintf (file_print, "%d\n", 2);
-            }
-            else if (strcmp (command, "SUB") == 0)
-            {
-                fprintf (file_print, "%d\n", 3);
-            }
-            else if (strcmp (command, "MUL") == 0)
-            {
-                fprintf (file_print, "%d\n", 4);
-            }
-            else if (strcmp (command, "ADD") == 0)
-            {
-                fprintf (file_print, "%d\n", 5);
-            }
-            else if (strcmp (command, "SQRT") == 0)
-            {
-                fprintf (file_print, "%d\n", 6);
-            }
-            else if (strcmp (command, "SIN") == 0)
-            {
-                fprintf (file_print, "%d\n", 7);
-            }
-            else if (strcmp (command, "COS") == 0)
-            {
-                fprintf (file_print, "%d\n", 8);
-            }
-            else if (strcmp (command, "PUSH") == 0)
-            {
-                fprintf (file_print, "%d ", 1);
-                if (fscanf (file_read, "%d", &number) != 1)
-                    return SYNTAX_ERR;
-                else
-                    fprintf (file_print, "%d\n", number);
+                (*commands_int)[num_commands - 2] |= BIT_IMM_CONST;
+                (*commands_int)[num_commands - 1] = (int) (strtol (command, NULL, 10));
             }
             else
             {
                 return SYNTAX_ERR;
             }
         }
+        else if (strncmp (str, "pop", 3) == 0)
+        {
+            (*commands_int)[num_commands - 2] = 0;
+            (*commands_int)[num_commands - 1] = 0;
+            (*commands_int)[num_commands - 2] |= POP;
+            if (sscanf (str + 4, "%s", command) != 1)
+                return SYNTAX_ERR;
+            if (strlen (command) == 3)
+            {
+                if (command[0] == 'r' && command[2] == 'x' && command[1] >= 'a' && command[1] <= 'd')
+                {
+                    (*commands_int)[num_commands - 2] |= BIT_REGISTER;
+                    (*commands_int)[num_commands - 1] = (int) (command[1] - 'a' + 1);
+                }
+            }
+            else
+            {
+                return SYNTAX_ERR;
+            }
+        }
+        else
+        {
+            return SYNTAX_ERR;
+        }
     }
     fclose (file_read);
+    *num_com = num_commands;
+    return CORRECT;
+}
+
+Errors print_commands_arr (const char* name_file_print, int* commands_int, int num_commands)
+{
+    FILE* file_print = fopen (name_file_print, "w");
+    if (!file_print)
+        return OPEN_FILE_ERR;
+
+    fprintf (file_print, "%s\n", SIGNATURE);
+    fprintf (file_print, "%d\n", VERSION);
+    fprintf (file_print, "%d\n", num_commands);
+
+    for (int i = 0; i < num_commands; i++)
+    {
+        fprintf (file_print, "%d\n", commands_int[i]);
+    }
     fclose (file_print);
     return CORRECT;
+}
+
+bool is_number (char* str)
+{
+    for (int i = 0; str[i] != '\0'; i++)
+        if (str[i] > '9' || str[i] < '0')
+            return false;
+    return true;
+}
+
+void del_comment (char* str)
+{
+    for (int i = 0; str[i] != '\0'; i++)
+    {
+        if (str[i] == ';')
+        {
+            str[i] = '\0';
+            break;
+        }
+    }
+}
+
+void del_slash_n (char* str)
+{
+    for (int i = 0; str[i] != '\0'; i++)
+    {
+        if (str[i] == '\n')
+        {
+            str[i] = '\0';
+            break;
+        }
+    }
 }

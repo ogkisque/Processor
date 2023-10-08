@@ -13,6 +13,9 @@
 #define MAKE_STACK(stk) \
         make_stack ((stk), #stk, __FILE__, __func__, __LINE__)
 
+#define STACK_DUMP(stk, error) \
+        stack_dump (stk, error, __FILE__, __func__, __LINE__);
+
 typedef int Elemt;
 #ifdef CANARY
 typedef unsigned long long Canaryt;
@@ -60,5 +63,16 @@ int delete_stack (Stack** stk);
 int stack_push (Stack* stk, Elemt value);
 int stack_pop (Stack* stk, Elemt* value);
 int print_stack (Stack* stk);
+int stack_verify (Stack* stk);
+int stack_ctor (Stack* stk, const char* name, const char* file, const char* func, int line);
+int stack_dtor (Stack* stk);
+void print_error (int error);
+void stack_dump (const Stack* stk, int error, const char* file, const char* func, int line);
+bool need_realloc (const Stack* stk);
+int stack_realloc (Stack* stk, Actions action);
+Elemt* get_elem_point (const Stack* stk, int num);
+#ifdef HASH
+Hasht get_hash (const Stack* stk);
+#endif
 
 #endif //STACK_HEADER
