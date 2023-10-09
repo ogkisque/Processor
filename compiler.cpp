@@ -12,20 +12,15 @@ enum Errors
     MEM_ALLOC_ERR = 3
 };
 
-const int MAX_COMMAND_LEN = 20;
 const int REALLOC_STEP = 10;
 const char* FILE_NAME_READ_DEF = "asm.txt";
 const char* FILE_NAME_PRINT_DEF = "byte_code.txt";
-const int MAX_NAME_LEN = 40;
-const char* SIGNATURE = "MEGERA";
-const int VERSION = 1;
 
 Errors get_commands_arr (const char* name_file_read, int** commands_int, int* num_com);
 Errors print_commands_arr (const char* name_file_print, int* commands_int, int num_commands);
 void print_error (Errors error);
 void del_comment (char* str);
 void del_slash_n (char* str);
-bool is_number (char* str);
 
 int main (int argc, char* argv[])
 {
@@ -89,7 +84,7 @@ Errors get_commands_arr (const char* name_file_read, int** commands_int, int* nu
 
     char command[MAX_COMMAND_LEN] = "";
     char str[MAX_COMMAND_LEN] = "";
-    int number = 0;
+    double number = 0.0;
     int num_commands = 0;
     int size_arr = REALLOC_STEP;
     (*commands_int) = (int*) calloc (REALLOC_STEP, sizeof (int));
@@ -167,18 +162,16 @@ Errors get_commands_arr (const char* name_file_read, int** commands_int, int* nu
             if (sscanf (str + 5, "%s", command) != 1)
                 return SYNTAX_ERR;
 
-            if (strlen (command) == 3)
+            if ((strlen (command) == 3) &&
+                (command[0] == 'r' && command[2] == 'x' && command[1] >= 'a' && command[1] <= 'd'))
             {
-                if (command[0] == 'r' && command[2] == 'x' && command[1] >= 'a' && command[1] <= 'd')
-                {
-                    (*commands_int)[num_commands - 2] |= BIT_REGISTER;
-                    (*commands_int)[num_commands - 1] = (int) (command[1] - 'a' + 1);
-                }
+                (*commands_int)[num_commands - 2] |= BIT_REGISTER;
+                (*commands_int)[num_commands - 1] = (int) (command[1] - 'a' + 1);
             }
-            else if (is_number (command))
+            else if (sscanf (command, "%lf", &number) == 1)
             {
                 (*commands_int)[num_commands - 2] |= BIT_IMM_CONST;
-                (*commands_int)[num_commands - 1] = (int) (strtol (command, NULL, 10));
+                (*commands_int)[num_commands - 1] = (int) (number * PRECISION);
             }
             else
             {
@@ -231,14 +224,6 @@ Errors print_commands_arr (const char* name_file_print, int* commands_int, int n
     }
     fclose (file_print);
     return CORRECT;
-}
-
-bool is_number (char* str)
-{
-    for (int i = 0; str[i] != '\0'; i++)
-        if (str[i] > '9' || str[i] < '0')
-            return false;
-    return true;
 }
 
 void del_comment (char* str)
