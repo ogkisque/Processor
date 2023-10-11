@@ -11,9 +11,6 @@
             return 1;               \
         }
 
-#define PARSE_ARGC          \
-
-
 enum Errors
 {
     CORRECT =      -1,
@@ -28,7 +25,7 @@ const char* FILE_NAME_PRINT_DEF = "byte_code.txt";
 const char* BIN_FILE_NAME_PRINT_DEF = "byte_code.bin";
 
 Errors get_commands_arr (const char* name_file_read, int** commands_int, int* num_com);
-Errors print_commands_arr (const char* name_file_print, int* commands_int, int num_commands);
+Errors print_commands_txt (const char* name_file_print, int* commands_int, int num_commands);
 Errors print_commands_bin (const char* name_file_print, int* commands_int, int num_commands);
 void print_error (Errors error);
 void del_comment (char* str);
@@ -57,8 +54,10 @@ int main (int argc, char* argv[])
     Errors error = get_commands_arr (file_name_read, &commands_int, &num_commands);
     PARSE_ERROR(error);
 
-    error = print_commands_arr (file_name_print, commands_int, num_commands);
+#ifdef TXT_BYTE_CODE
+    error = print_commands_txt (file_name_print, commands_int, num_commands);
     PARSE_ERROR(error);
+#endif
 
     error = print_commands_bin (bin_file_name_print, commands_int, num_commands);
     PARSE_ERROR(error);
@@ -114,104 +113,70 @@ Errors get_commands_arr (const char* name_file_read, int** commands_int, int* nu
                 return MEM_ALLOC_ERR;
         }
 
-        if (strcmp (str, "hlt") == 0)
+        bool is_read_command = false;
+        for (int i = 0; i < NUM_OF_COMMANDS; i++)
         {
-            (*commands_int)[num_commands - 2] = HLT;
-            num_commands--;
-        }
-        else if (strcmp (str, "out") == 0)
-        {
-            (*commands_int)[num_commands - 2] = OUT;
-            num_commands--;
-        }
-        else if (strcmp (str, "in") == 0)
-        {
-            (*commands_int)[num_commands - 2] = IN;
-            num_commands--;
-        }
-        else if (strcmp (str, "div") == 0)
-        {
-            (*commands_int)[num_commands - 2] = DIV;
-            num_commands--;
-        }
-        else if (strcmp (str, "sub") == 0)
-        {
-            (*commands_int)[num_commands - 2] = SUB;
-            num_commands--;
-        }
-        else if (strcmp (str, "mul") == 0)
-        {
-            (*commands_int)[num_commands - 2] = MUL;
-            num_commands--;
-        }
-        else if (strcmp (str, "add") == 0)
-        {
-            (*commands_int)[num_commands - 2] = ADD;
-            num_commands--;
-        }
-        else if (strcmp (str, "sqrt") == 0)
-        {
-            (*commands_int)[num_commands - 2] = SQRT;
-            num_commands--;
-        }
-        else if (strcmp (str, "sin") == 0)
-        {
-            (*commands_int)[num_commands - 2] = SIN;
-            num_commands--;
-        }
-        else if (strcmp (str, "cos") == 0)
-        {
-            (*commands_int)[num_commands - 2] = COS;
-            num_commands--;
-        }
-        else if (strncmp (str, "push", 4) == 0)
-        {
-            (*commands_int)[num_commands - 2] = 0;
-            (*commands_int)[num_commands - 1] = 0;
-            (*commands_int)[num_commands - 2] |= PUSH;
-            if (sscanf (str + 5, "%s", command) != 1)
-                return SYNTAX_ERR;
-
-            if ((strlen (command) == 3) &&
-                (command[0] == 'r' && command[2] == 'x' && command[1] >= 'a' && command[1] <= 'd'))
+            if (strncmp (str, COMMANDS_LIST[i].name, strlen (COMMANDS_LIST[i].name)) ==  0)
             {
-                (*commands_int)[num_commands - 2] |= BIT_REGISTER;
-                (*commands_int)[num_commands - 1] = (int) (command[1] - 'a' + 1);
-            }
-            else if (sscanf (command, "%lf", &number) == 1)
-            {
-                (*commands_int)[num_commands - 2] |= BIT_IMM_CONST;
-                (*commands_int)[num_commands - 1] = (int) (number * PRECISION);
-            }
-            else
-            {
-                return SYNTAX_ERR;
-            }
-        }
-        else if (strncmp (str, "pop", 3) == 0)
-        {
-            (*commands_int)[num_commands - 2] = 0;
-            (*commands_int)[num_commands - 1] = 0;
-            (*commands_int)[num_commands - 2] |= POP;
-            if (sscanf (str + 4, "%s", command) != 1)
-                return SYNTAX_ERR;
-            if (strlen (command) == 3)
-            {
-                if (command[0] == 'r' && command[2] == 'x' && command[1] >= 'a' && command[1] <= 'd')
+                is_read_command = true;
+                switch (COMMANDS_LIST[i].arg_type)
                 {
-                    (*commands_int)[num_commands - 2] |= BIT_REGISTER;
-                    (*commands_int)[num_commands - 1] = (int) (command[1] - 'a' + 1);
+                    case NO_ARG:
+                        (*commands_int)[num_commands - 2] = COMMANDS_LIST[i].code;
+                        num_commands--;
+                        break;
+                    case REG_ARG:
+                        (*commands_int)[num_commands - 2] = 0;
+                        (*commands_int)[num_commands - 1] = 0;
+                        (*commands_int)[num_commands - 2] |= COMMANDS_LIST[i].code;
+                        if (sscanf (str + 4, "%s", command) != 1)
+                            return SYNTAX_ERR;
+                        if (strlen (command) == 3)
+                        {
+                            if (command[0] == 'r' && command[2] == 'x' && command[1] >= 'a' && command[1] <= 'd')
+                            {
+                                (*commands_int)[num_commands - 2] |= BIT_REGISTER;
+                                (*commands_int)[num_commands - 1] = (int) (command[1] - 'a' + 1);
+                            }
+                        }
+                        else
+                        {
+                            return SYNTAX_ERR;
+                        }
+                        break;
+                    case NUM_ARG:
+                        break;
+                    case NUM_OR_REG_ARG:
+                        (*commands_int)[num_commands - 2] = 0;
+                        (*commands_int)[num_commands - 1] = 0;
+                        (*commands_int)[num_commands - 2] |= COMMANDS_LIST[i].code;
+                        if (sscanf (str + 5, "%s", command) != 1)
+                            return SYNTAX_ERR;
+
+                        if ((strlen (command) == 3) &&
+                            (command[0] == 'r' && command[2] == 'x' && command[1] >= 'a' && command[1] <= 'd'))
+                        {
+                            (*commands_int)[num_commands - 2] |= BIT_REGISTER;
+                            (*commands_int)[num_commands - 1] = (int) (command[1] - 'a' + 1);
+                        }
+                        else if (sscanf (command, "%lf", &number) == 1)
+                        {
+                            (*commands_int)[num_commands - 2] |= BIT_IMM_CONST;
+                            (*commands_int)[num_commands - 1] = (int) (number * PRECISION);
+                        }
+                        else
+                        {
+                            return SYNTAX_ERR;
+                        }
+                        break;
+                    default:
+                        break;
                 }
-            }
-            else
-            {
-                return SYNTAX_ERR;
+                break;
             }
         }
-        else
-        {
+        if (!is_read_command)
             return SYNTAX_ERR;
-        }
     }
     fclose (file_read);
     *num_com = num_commands;
@@ -233,7 +198,8 @@ Errors print_commands_bin (const char* name_file_print, int* commands_int, int n
     return CORRECT;
 }
 
-Errors print_commands_arr (const char* name_file_print, int* commands_int, int num_commands)
+#ifdef TXT_BYTE_CODE
+Errors print_commands_txt (const char* name_file_print, int* commands_int, int num_commands)
 {
     FILE* file_print = fopen (name_file_print, "w");
     if (!file_print)
@@ -250,6 +216,7 @@ Errors print_commands_arr (const char* name_file_print, int* commands_int, int n
     fclose (file_print);
     return CORRECT;
 }
+#endif
 
 void del_comment (char* str)
 {
