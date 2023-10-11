@@ -19,7 +19,7 @@ enum Commands
 
 const int BIT_IMM_CONST = 1 << 4;
 const int BIT_REGISTER = 1 << 5;
-const char* SIGNATURE = "MEGERA";
+const char SIGNATURE[] = "MEG";
 const int VERSION = 1;
 const int MAX_NAME_LEN = 40;
 const int PRECISION = 100;

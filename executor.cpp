@@ -5,8 +5,17 @@
 #include "stack.h"
 #include "commands.h"
 
+#define READ_TXT_FILE
+
 #define SPU_CTOR(sp, num_commands) \
         spu_ctor ((sp), num_commands, #sp, __FILE__, __func__, __LINE__)
+
+#define PARSE_ERROR(sp, error)              \
+        if (error != 0)                     \
+        {                                   \
+            print_error_spu (sp, error);    \
+            return 1;                       \
+        }
 
 struct Spu
 {
@@ -40,9 +49,15 @@ enum Errors_spu
 };
 
 const char* FILE_NAME_READ_DEF = "byte_code.txt";
+const char* BIN_FILE_NAME_READ_DEF = "byte_code.bin";
 const int PI = 3.1415926;
+const int NUM_ERR_STACK = 1;
+const int NUM_ERR_SPU = 2;
+const int CODE_ERROR_MASK = 0x00FFFFFF;
+const int TYPE_ERROR_MASK = 0xFF000000;
 
 int read_byte_code (char* file_name_read, Spu* sp);
+int read_bin_byte_code (char* file_name_read, Spu* sp);
 int execute (Spu* sp);
 void print_error_spu (Spu* sp, int error);
 int spu_ctor (Spu* sp, int num_commands, const char* name, const char* file, const char* func, int line);
@@ -53,27 +68,66 @@ void spu_dump (Spu* sp, int error);
 int main (int argc, char* argv[])
 {
     char file_name_read[MAX_NAME_LEN] = "";
-    if (argc < 2)
+    char bin_file_name_read[MAX_NAME_LEN] = "";
+    if (argc < 3)
+    {
+        strcpy (bin_file_name_read, BIN_FILE_NAME_READ_DEF);
         strcpy (file_name_read, FILE_NAME_READ_DEF);
+    }
     else
+    {
         strcpy (file_name_read, argv[1]);
-
-    Spu sp = {};
-
-    int error = read_byte_code (file_name_read, &sp);
-    if (error != 0)
-    {
-        print_error_spu (&sp, error);
-        return 1;
+        strcpy (bin_file_name_read, argv[2]);
     }
 
-    error = execute (&sp);
-    if (error != 0)
-    {
-        print_error_spu (&sp, error);
-        return 1;
-    }
+    int error = 0;
+#ifdef READ_TXT_FILE
+    printf ("With .txt file\n");
+    Spu sp1 = {};
+    error = read_byte_code (file_name_read, &sp1);
+    PARSE_ERROR(&sp1, error);
+    error = execute (&sp1);
+    PARSE_ERROR(&sp1, error);
+#endif
+
+    printf ("With .bin file\n");
+    Spu sp2 = {};
+    error = read_bin_byte_code (bin_file_name_read, &sp2);
+    PARSE_ERROR(&sp2, error);
+    error = execute (&sp2);
+    PARSE_ERROR(&sp2, error);
+
     return 0;
+}
+
+int read_bin_byte_code (char* file_name_read, Spu* sp)
+{
+    int error = 0;
+
+    FILE* file_read = fopen (file_name_read, "rb");
+    if (!file_read)
+        return OPEN_FILE_ERR;
+
+    char sign[MAX_COMMAND_LEN] = "";
+    int read = fread (sign, sizeof (char), sizeof (SIGNATURE) / sizeof (char), file_read);
+    if (strcmp (sign, SIGNATURE) != 0)
+        return SIGNATURE_ERR;
+
+    int vers = 0;
+    fread (&vers, sizeof (int), 1, file_read);
+    if (vers != VERSION)
+        return VERSION_ERR;
+
+    int num_commands = 0;
+    fread (&num_commands, sizeof (int), 1, file_read);
+    error = SPU_CTOR(sp, num_commands);
+    if (error != 0)
+        spu_dump (sp, error);
+
+    fread (sp->code, sizeof (int), num_commands, file_read);
+
+    fclose (file_read);
+    return error;
 }
 
 int read_byte_code (char* file_name_read, Spu* sp)
@@ -131,6 +185,7 @@ int read_byte_code (char* file_name_read, Spu* sp)
 void print_error_spu (Spu* sp, int error)
 {
     printf (BOLD_RED_COL);
+
     if (error & NULL_POINTER_SPU)
         printf ("Null pointer\n");
     if (error & STACK_ERR)
@@ -182,6 +237,7 @@ int execute (Spu* sp)
         }
         else if (command == IN)
         {
+            printf ("Enter the number: ");
             if (scanf ("%lf", &num_double) == 1)
                 stack_push (sp->stk, (int) (num_double * PRECISION));
             else
@@ -352,9 +408,9 @@ int spu_verify (Spu* sp)
     int error = 0;
     if (!sp)
         return NULL_POINTER_SPU;
-    if (stack_verify (sp->stk) != 0)                                                            error |= STACK_ERR;
-    if (sp->rax == INT_MAX || sp->rbx == INT_MAX || sp->rcx == INT_MAX || sp->rbx == INT_MAX)   error |= RUBBISH_SPU;
-    if (!(sp->code) || !(sp->file) || !(sp->func) || !(sp->name))                                  error |= NULL_POINTER;
+    if (stack_verify (sp->stk) != 0)                                                                error |= STACK_ERR;
+    if (sp->rax == INT_MAX || sp->rbx == INT_MAX || sp->rcx == INT_MAX || sp->rbx == INT_MAX)       error |= RUBBISH_SPU;
+    if (!(sp->code) || !(sp->file) || !(sp->func) || !(sp->name))                                   error |= NULL_POINTER_SPU;
     return error;
 }
 

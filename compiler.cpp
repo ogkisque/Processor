@@ -4,6 +4,16 @@
 
 #include "commands.h"
 
+#define PARSE_ERROR(error)          \
+        if (error != CORRECT)       \
+        {                           \
+            print_error (error);    \
+            return 1;               \
+        }
+
+#define PARSE_ARGC          \
+
+
 enum Errors
 {
     CORRECT =      -1,
@@ -15,9 +25,11 @@ enum Errors
 const int REALLOC_STEP = 10;
 const char* FILE_NAME_READ_DEF = "asm.txt";
 const char* FILE_NAME_PRINT_DEF = "byte_code.txt";
+const char* BIN_FILE_NAME_PRINT_DEF = "byte_code.bin";
 
 Errors get_commands_arr (const char* name_file_read, int** commands_int, int* num_com);
 Errors print_commands_arr (const char* name_file_print, int* commands_int, int num_commands);
+Errors print_commands_bin (const char* name_file_print, int* commands_int, int num_commands);
 void print_error (Errors error);
 void del_comment (char* str);
 void del_slash_n (char* str);
@@ -26,32 +38,30 @@ int main (int argc, char* argv[])
 {
     char file_name_read[MAX_NAME_LEN] = "";
     char file_name_print[MAX_NAME_LEN] = "";
-    if (argc < 3)
+    char bin_file_name_print[MAX_NAME_LEN] = "";
+    if (argc < 4)
     {
         strcpy (file_name_read, FILE_NAME_READ_DEF);
         strcpy (file_name_print, FILE_NAME_PRINT_DEF);
+        strcpy (bin_file_name_print, BIN_FILE_NAME_PRINT_DEF);
     }
     else
     {
         strcpy (file_name_read, argv[1]);
         strcpy (file_name_print, argv[2]);
+        strcpy (bin_file_name_print, argv[3]);
     }
 
     int* commands_int;
     int num_commands = 0;
     Errors error = get_commands_arr (file_name_read, &commands_int, &num_commands);
-    if (error != CORRECT)
-    {
-        print_error (error);
-        return 1;
-    }
+    PARSE_ERROR(error);
 
     error = print_commands_arr (file_name_print, commands_int, num_commands);
-    if (error != CORRECT)
-    {
-        print_error (error);
-        return 1;
-    }
+    PARSE_ERROR(error);
+
+    error = print_commands_bin (bin_file_name_print, commands_int, num_commands);
+    PARSE_ERROR(error);
     return 0;
 }
 
@@ -205,6 +215,21 @@ Errors get_commands_arr (const char* name_file_read, int** commands_int, int* nu
     }
     fclose (file_read);
     *num_com = num_commands;
+    return CORRECT;
+}
+
+Errors print_commands_bin (const char* name_file_print, int* commands_int, int num_commands)
+{
+    FILE* file_print = fopen (name_file_print, "wb");
+    if (!file_print)
+        return OPEN_FILE_ERR;
+
+    fwrite (SIGNATURE, sizeof (char), sizeof (SIGNATURE) / sizeof (char), file_print);
+    fwrite (&VERSION, sizeof (int), 1, file_print);
+    fwrite (&num_commands, sizeof (int), 1, file_print);
+    fwrite (commands_int, sizeof (int), num_commands, file_print);
+
+    fclose (file_print);
     return CORRECT;
 }
 
