@@ -16,7 +16,8 @@ enum Errors
     CORRECT =      -1,
     OPEN_FILE_ERR = 1,
     SYNTAX_ERR    = 2,
-    MEM_ALLOC_ERR = 3
+    MEM_ALLOC_ERR = 3,
+    NULL_POINTER =  4
 };
 
 const int REALLOC_STEP = 10;
@@ -25,14 +26,18 @@ const char* FILE_NAME_PRINT_DEF = "byte_code.txt";
 const char* BIN_FILE_NAME_PRINT_DEF = "byte_code.bin";
 
 Errors get_commands_arr (const char* name_file_read, int** commands_int, int* num_com);
-Errors print_commands_txt (const char* name_file_print, int* commands_int, int num_commands);
-Errors print_commands_bin (const char* name_file_print, int* commands_int, int num_commands);
+#ifdef TXT_BYTE_CODE
+Errors print_commands_txt (const char* name_file_print, int* commands_int, File_Header* header);
+#endif
+Errors print_commands_bin (const char* name_file_print, int* commands_int, File_Header* header);
+Errors header_ctor (File_Header* header, int num_comm);
 void print_error (Errors error);
 void del_comment (char* str);
 void del_slash_n (char* str);
 
 int main (int argc, char* argv[])
 {
+
     char file_name_read[MAX_NAME_LEN] = "";
     char file_name_print[MAX_NAME_LEN] = "";
     char bin_file_name_print[MAX_NAME_LEN] = "";
@@ -54,12 +59,15 @@ int main (int argc, char* argv[])
     Errors error = get_commands_arr (file_name_read, &commands_int, &num_commands);
     PARSE_ERROR(error);
 
+    File_Header header = {};
+    header_ctor (&header, num_commands);
+
 #ifdef TXT_BYTE_CODE
-    error = print_commands_txt (file_name_print, commands_int, num_commands);
+    error = print_commands_txt (file_name_print, commands_int, &header);
     PARSE_ERROR(error);
 #endif
 
-    error = print_commands_bin (bin_file_name_print, commands_int, num_commands);
+    error = print_commands_bin (bin_file_name_print, commands_int, &header);
     PARSE_ERROR(error);
     return 0;
 }
@@ -76,6 +84,9 @@ void print_error (Errors error)
         break;
     case MEM_ALLOC_ERR:
         printf ("Error is in allocation of memory\n");
+        break;
+    case NULL_POINTER:
+        printf ("Null pointer\n");
         break;
     case CORRECT:
         printf ("Correct compilation\n");
@@ -183,33 +194,33 @@ Errors get_commands_arr (const char* name_file_read, int** commands_int, int* nu
     return CORRECT;
 }
 
-Errors print_commands_bin (const char* name_file_print, int* commands_int, int num_commands)
+Errors print_commands_bin (const char* name_file_print, int* commands_int, File_Header* header)
 {
+    if (!name_file_print || !commands_int || !header)
+        return NULL_POINTER;
     FILE* file_print = fopen (name_file_print, "wb");
     if (!file_print)
         return OPEN_FILE_ERR;
 
-    fwrite (SIGNATURE, sizeof (char), sizeof (SIGNATURE) / sizeof (char), file_print);
-    fwrite (&VERSION, sizeof (int), 1, file_print);
-    fwrite (&num_commands, sizeof (int), 1, file_print);
-    fwrite (commands_int, sizeof (int), num_commands, file_print);
+    fwrite (header, sizeof (File_Header), 1, file_print);
+    fwrite (commands_int, sizeof (int), header->num_commands, file_print);
 
     fclose (file_print);
     return CORRECT;
 }
 
 #ifdef TXT_BYTE_CODE
-Errors print_commands_txt (const char* name_file_print, int* commands_int, int num_commands)
+Errors print_commands_txt (const char* name_file_print, int* commands_int, File_Header* header)
 {
     FILE* file_print = fopen (name_file_print, "w");
     if (!file_print)
         return OPEN_FILE_ERR;
 
-    fprintf (file_print, "%s\n", SIGNATURE);
-    fprintf (file_print, "%d\n", VERSION);
-    fprintf (file_print, "%d\n", num_commands);
+    fprintf (file_print, "%s\n", header->signature);
+    fprintf (file_print, "%d\n", header->version);
+    fprintf (file_print, "%d\n", header->num_commands);
 
-    for (int i = 0; i < num_commands; i++)
+    for (int i = 0; i < header->num_commands; i++)
     {
         fprintf (file_print, "%d\n", commands_int[i]);
     }
@@ -240,4 +251,14 @@ void del_slash_n (char* str)
             break;
         }
     }
+}
+
+Errors header_ctor (File_Header* header, int num_comm)
+{
+    if (!header)
+        return NULL_POINTER;
+    strcpy (header->signature, SIGNATURE);
+    header->version = VERSION;
+    header->num_commands = num_comm;
+    return CORRECT;
 }

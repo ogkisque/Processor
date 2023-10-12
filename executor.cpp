@@ -5,8 +5,6 @@
 #include "stack.h"
 #include "commands.h"
 
-#define READ_TXT_FILE
-
 #define SPU_CTOR(sp, num_commands) \
         spu_ctor ((sp), num_commands, #sp, __FILE__, __func__, __LINE__)
 
@@ -56,7 +54,9 @@ const int NUM_ERR_SPU = 2;
 const int CODE_ERROR_MASK = 0x00FFFFFF;
 const int TYPE_ERROR_MASK = 0xFF000000;
 
-int read_byte_code (char* file_name_read, Spu* sp);
+#ifdef TXT_BYTE_CODE
+int read_txt_byte_code (char* file_name_read, Spu* sp);
+#endif
 int read_bin_byte_code (char* file_name_read, Spu* sp);
 int execute (Spu* sp);
 void print_error_spu (Spu* sp, int error);
@@ -81,10 +81,10 @@ int main (int argc, char* argv[])
     }
 
     int error = 0;
-#ifdef READ_TXT_FILE
+#ifdef TXT_BYTE_CODE
     printf ("With .txt file\n");
     Spu sp1 = {};
-    error = read_byte_code (file_name_read, &sp1);
+    error = read_txt_byte_code (file_name_read, &sp1);
     PARSE_ERROR(&sp1, error);
     error = execute (&sp1);
     PARSE_ERROR(&sp1, error);
@@ -108,29 +108,26 @@ int read_bin_byte_code (char* file_name_read, Spu* sp)
     if (!file_read)
         return OPEN_FILE_ERR;
 
-    char sign[MAX_COMMAND_LEN] = "";
-    int read = fread (sign, sizeof (char), sizeof (SIGNATURE) / sizeof (char), file_read);
-    if (strcmp (sign, SIGNATURE) != 0)
-        return SIGNATURE_ERR;
+    File_Header header = {};
+    fread (&header, sizeof (header), 1, file_read);
 
-    int vers = 0;
-    fread (&vers, sizeof (int), 1, file_read);
-    if (vers != VERSION)
+    if (strcmp (header.signature, SIGNATURE) != 0)
+        return SIGNATURE_ERR;
+    if (header.version != VERSION)
         return VERSION_ERR;
 
-    int num_commands = 0;
-    fread (&num_commands, sizeof (int), 1, file_read);
-    error = SPU_CTOR(sp, num_commands);
+    error = SPU_CTOR(sp, header.num_commands);
     if (error != 0)
         spu_dump (sp, error);
 
-    fread (sp->code, sizeof (int), num_commands, file_read);
+    fread (sp->code, sizeof (int), header.num_commands, file_read);
 
     fclose (file_read);
     return error;
 }
 
-int read_byte_code (char* file_name_read, Spu* sp)
+#ifdef TXT_BYTE_CODE
+int read_txt_byte_code (char* file_name_read, Spu* sp)
 {
     int error = 0;
 
@@ -181,6 +178,7 @@ int read_byte_code (char* file_name_read, Spu* sp)
     fclose (file_read);
     return error;
 }
+#endif
 
 void print_error_spu (Spu* sp, int error)
 {
@@ -226,77 +224,68 @@ int execute (Spu* sp)
     while (i < sp->num_comm)
     {
         command = (sp->code)[i];
-        if (command == HLT)
+        switch (command & CODE_COMMAND_MASK)
         {
-            return error;
-        }
-        else if (command == OUT)
-        {
-            stack_pop (sp->stk, &number);
-            printf ("%lf\n", (double) number / PRECISION);
-        }
-        else if (command == IN)
-        {
-            printf ("Enter the number: ");
-            if (scanf ("%lf", &num_double) == 1)
-                stack_push (sp->stk, (int) (num_double * PRECISION));
-            else
-                return INPUT_NUM_ERR;
-        }
-        else if (command == DIV)
-        {
-            if (stack_pop (sp->stk, &number) + stack_pop (sp->stk, &number1) != 0)
-                return SYNTAX_ERR;
-            else
-                stack_push (sp->stk, (int) (((double) number1 / (double) number) * PRECISION));
-        }
-        else if (command == SUB)
-        {
-            if (stack_pop (sp->stk, &number) + stack_pop (sp->stk, &number1) != 0)
-                return SYNTAX_ERR;
-            else
-                stack_push (sp->stk, number1 - number);
-        }
-        else if (command == MUL)
-        {
-            if (stack_pop (sp->stk, &number) + stack_pop (sp->stk, &number1) != 0)
-                return SYNTAX_ERR;
-            else
-                stack_push (sp->stk, number * number1 / PRECISION);
-        }
-        else if (command == ADD)
-        {
-            if (stack_pop (sp->stk, &number) + stack_pop (sp->stk, &number1) != 0)
-                return SYNTAX_ERR;
-            else
-                stack_push (sp->stk, number + number1);
-        }
-        else if (command == SQRT)
-        {
-            if (stack_pop (sp->stk, &number) != 0)
-                return SYNTAX_ERR;
-            else
-                stack_push (sp->stk, (int) (sqrt ((double) number / PRECISION) * PRECISION));
-        }
-        else if (command == SIN)
-        {
-            if (stack_pop (sp->stk, &number) != 0)
-                return SYNTAX_ERR;
-            else
-                stack_push (sp->stk, (int) (sin ((double) number / PRECISION * PI / 180) * PRECISION));
-        }
-        else if (command == COS)
-        {
-            if (stack_pop (sp->stk, &number) != 0)
-                return SYNTAX_ERR;
-            else
-                stack_push (sp->stk, (int) (cos ((double) number / PRECISION * PI / 180) * PRECISION));
-        }
-        else
-        {
-            i++;
-            if ((command & CODE_COMMAND_MASK) == PUSH)
-            {
+            case HLT:
+                return error;
+                break;
+            case OUT:
+                if (stack_pop (sp->stk, &number) != 0)
+                    return SYNTAX_ERR;
+                else
+                    printf ("%lf\n", (double) number / PRECISION);
+                break;
+            case IN:
+                printf ("Enter the number: ");
+                if (scanf ("%lf", &num_double) == 1)
+                    stack_push (sp->stk, (int) (num_double * PRECISION));
+                else
+                    return INPUT_NUM_ERR;
+                break;
+            case DIV:
+                if (stack_pop (sp->stk, &number) + stack_pop (sp->stk, &number1) != 0)
+                    return SYNTAX_ERR;
+                else
+                    stack_push (sp->stk, (int) (((double) number1 / (double) number) * PRECISION));
+                break;
+            case SUB:
+                if (stack_pop (sp->stk, &number) + stack_pop (sp->stk, &number1) != 0)
+                    return SYNTAX_ERR;
+                else
+                    stack_push (sp->stk, number1 - number);
+                break;
+            case MUL:
+                if (stack_pop (sp->stk, &number) + stack_pop (sp->stk, &number1) != 0)
+                    return SYNTAX_ERR;
+                else
+                    stack_push (sp->stk, number * number1 / PRECISION);
+                break;
+            case ADD:
+                if (stack_pop (sp->stk, &number) + stack_pop (sp->stk, &number1) != 0)
+                    return SYNTAX_ERR;
+                else
+                    stack_push (sp->stk, number + number1);
+                break;
+            case SQRT:
+                if (stack_pop (sp->stk, &number) != 0)
+                    return SYNTAX_ERR;
+                else
+                    stack_push (sp->stk, (int) (sqrt ((double) number / PRECISION) * PRECISION));
+                break;
+            case SIN:
+                if (stack_pop (sp->stk, &number) != 0)
+                    return SYNTAX_ERR;
+                else
+                    stack_push (sp->stk, (int) (sin ((double) number / PRECISION * PI / 180) * PRECISION));
+                break;
+            case COS:
+                if (stack_pop (sp->stk, &number) != 0)
+                    return SYNTAX_ERR;
+                else
+                    stack_push (sp->stk, (int) (cos ((double) number / PRECISION * PI / 180) * PRECISION));
+                break;
+            case PUSH:
+                i++;
                 if (command & BIT_IMM_CONST)
                 {
                     number = (sp->code)[i];
@@ -322,9 +311,9 @@ int execute (Spu* sp)
                 {
                     return SYNTAX_ERR;
                 }
-            }
-            else if ((command & CODE_COMMAND_MASK) == POP)
-            {
+                break;
+            case POP:
+                i++;
                 if (command & BIT_REGISTER)
                 {
                     number = (sp->code)[i];
@@ -343,11 +332,11 @@ int execute (Spu* sp)
                 {
                     return SYNTAX_ERR;
                 }
-            }
-            else
-            {
+                break;
+            default:
+                puts ("AAA");
                 return SYNTAX_ERR;
-            }
+                break;
         }
         i++;
     }
