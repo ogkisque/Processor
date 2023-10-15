@@ -98,6 +98,9 @@ void print_error (Errors error)
 
 Errors get_commands_arr (const char* name_file_read, int** commands_int, int* num_com)
 {
+    if (!name_file_read || !commands_int || !num_com)
+        return NULL_POINTER;
+
     FILE* file_read = fopen (name_file_read, "r");
     if (!file_read)
         return OPEN_FILE_ERR;
@@ -198,6 +201,7 @@ Errors print_commands_bin (const char* name_file_print, int* commands_int, File_
 {
     if (!name_file_print || !commands_int || !header)
         return NULL_POINTER;
+
     FILE* file_print = fopen (name_file_print, "wb");
     if (!file_print)
         return OPEN_FILE_ERR;
@@ -212,6 +216,9 @@ Errors print_commands_bin (const char* name_file_print, int* commands_int, File_
 #ifdef TXT_BYTE_CODE
 Errors print_commands_txt (const char* name_file_print, int* commands_int, File_Header* header)
 {
+    if (!name_file_print || !commands_int || !header)
+        return NULL_POINTER;
+
     FILE* file_print = fopen (name_file_print, "w");
     if (!file_print)
         return OPEN_FILE_ERR;
@@ -257,6 +264,7 @@ Errors header_ctor (File_Header* header, int num_comm)
 {
     if (!header)
         return NULL_POINTER;
+
     strcpy (header->signature, SIGNATURE);
     header->version = VERSION;
     header->num_commands = num_comm;

@@ -9,11 +9,23 @@
         spu_ctor ((sp), num_commands, #sp, __FILE__, __func__, __LINE__)
 
 #define PARSE_ERROR(sp, error)              \
-        if (error != 0)                     \
+        if (error.err_code != CORRECT)      \
         {                                   \
             print_error_spu (sp, error);    \
             return 1;                       \
         }
+
+#define RETURN_ERROR(code, message) \
+        return Error {code, __LINE__, __FILE__, __func__, message}
+
+struct Error
+{
+    int err_code;
+    int err_line;
+    const char* err_file;
+    const char* err_func;
+    const char* err_message;
+};
 
 struct Spu
 {
@@ -34,16 +46,17 @@ struct Spu
 
 enum Errors_spu
 {
-    STACK_ERR =         1 << 1,
-    NULL_POINTER_SPU =  1 << 2,
-    RUBBISH_SPU =       1 << 3,
-    MEM_ALLOC_ERR_SPU = 1 << 4,
-    OPEN_FILE_ERR =     1 << 5,
-    INPUT_NUM_ERR =     1 << 6,
-    SYNTAX_ERR =        1 << 7,
-    VERSION_ERR =       1 << 8,
-    SIGNATURE_ERR =     1 << 9,
-    VERIFY_ERR =        1 << 10
+    CORRECT =           0,
+    STACK_ERR =         1,
+    NULL_POINTER_SPU =  2,
+    RUBBISH_SPU =       3,
+    MEM_ALLOC_ERR_SPU = 4,
+    OPEN_FILE_ERR =     5,
+    INPUT_NUM_ERR =     6,
+    SYNTAX_ERR =        7,
+    VERSION_ERR =       8,
+    SIGNATURE_ERR =     9,
+    VERIFY_ERR =        10
 };
 
 const char* FILE_NAME_READ_DEF = "byte_code.txt";
@@ -55,15 +68,15 @@ const int CODE_ERROR_MASK = 0x00FFFFFF;
 const int TYPE_ERROR_MASK = 0xFF000000;
 
 #ifdef TXT_BYTE_CODE
-int read_txt_byte_code (char* file_name_read, Spu* sp);
+Error read_txt_byte_code (char* file_name_read, Spu* sp);
 #endif
-int read_bin_byte_code (char* file_name_read, Spu* sp);
-int execute (Spu* sp);
-void print_error_spu (Spu* sp, int error);
-int spu_ctor (Spu* sp, int num_commands, const char* name, const char* file, const char* func, int line);
-int spu_dtor (Spu* sp);
-int spu_verify (Spu* sp);
-void spu_dump (Spu* sp, int error);
+Error read_bin_byte_code (char* file_name_read, Spu* sp);
+Error execute (Spu* sp);
+void print_error_spu (Spu* sp, Error error);
+Error spu_ctor (Spu* sp, int num_commands, const char* name, const char* file, const char* func, int line);
+Error spu_dtor (Spu* sp);
+Error spu_verify (Spu* sp);
+void spu_dump (Spu* sp, Error error);
 
 int main (int argc, char* argv[])
 {
@@ -80,7 +93,7 @@ int main (int argc, char* argv[])
         strcpy (bin_file_name_read, argv[2]);
     }
 
-    int error = 0;
+    Error error = {};
 #ifdef TXT_BYTE_CODE
     printf ("With .txt file\n");
     Spu sp1 = {};
@@ -100,40 +113,42 @@ int main (int argc, char* argv[])
     return 0;
 }
 
-int read_bin_byte_code (char* file_name_read, Spu* sp)
+Error read_bin_byte_code (char* file_name_read, Spu* sp)
 {
-    int error = 0;
+    if (!file_name_read || !sp)
+        RETURN_ERROR(NULL_POINTER_SPU, "Null pointer\n");
 
     FILE* file_read = fopen (file_name_read, "rb");
     if (!file_read)
-        return OPEN_FILE_ERR;
+        RETURN_ERROR(OPEN_FILE_ERR, "Error of opening file\n");
 
     File_Header header = {};
     fread (&header, sizeof (header), 1, file_read);
 
     if (strcmp (header.signature, SIGNATURE) != 0)
-        return SIGNATURE_ERR;
+        RETURN_ERROR(SIGNATURE_ERR, "Incorrect signature");
     if (header.version != VERSION)
-        return VERSION_ERR;
+        RETURN_ERROR(VERSION_ERR, "Incorrect version");
 
-    error = SPU_CTOR(sp, header.num_commands);
-    if (error != 0)
+    Error error = SPU_CTOR(sp, header.num_commands);
+    if (error.err_code != CORRECT)
         spu_dump (sp, error);
 
     fread (sp->code, sizeof (int), header.num_commands, file_read);
 
     fclose (file_read);
-    return error;
+    RETURN_ERROR(CORRECT, "");
 }
 
 #ifdef TXT_BYTE_CODE
-int read_txt_byte_code (char* file_name_read, Spu* sp)
+Error read_txt_byte_code (char* file_name_read, Spu* sp)
 {
-    int error = 0;
+    if (!file_name_read || !sp)
+        RETURN_ERROR(NULL_POINTER, "Null pointer\n");
 
     FILE* file_read = fopen (file_name_read, "r");
     if (!file_read)
-        return OPEN_FILE_ERR;
+        RETURN_ERROR(OPEN_FILE_ERR, "Error of opening file\n");
 
     char str[MAX_COMMAND_LEN] = "";
     int number = 0;
@@ -143,27 +158,27 @@ int read_txt_byte_code (char* file_name_read, Spu* sp)
         if (i == 0)
         {
             if (strcmp (str, SIGNATURE) != 0)
-                return SIGNATURE_ERR;
+                RETURN_ERROR(SIGNATURE_ERR, "Incorrect signature");
         }
         else
         {
             if (sscanf (str, "%d", &number) != 1)
             {
-                return SYNTAX_ERR;
+                RETURN_ERROR(SYNTAX_ERR, "Error in syntax");
             }
             else
             {
                 if (i == 1)
                 {
                     if (number != VERSION)
-                        return VERSION_ERR;
+                        RETURN_ERROR(VERSION_ERR, "Incorrect version");
                 }
                 else if (i == 2)
                 {
                     if (number < 0)
-                        return SYNTAX_ERR;
-                    int err = SPU_CTOR(sp, number);
-                    if (err != 0)
+                        RETURN_ERROR(SYNTAX_ERR, "Negative number of commands");
+                    Error err = SPU_CTOR(sp, number);
+                    if (err.err_code != CORRECT)
                         spu_dump (sp, err);
                 }
                 else
@@ -176,44 +191,33 @@ int read_txt_byte_code (char* file_name_read, Spu* sp)
     }
 
     fclose (file_read);
-    return error;
+    RETURN_ERROR(CORRECT, "");
 }
 #endif
 
-void print_error_spu (Spu* sp, int error)
+void print_error_spu (Spu* sp, Error error)
 {
     printf (BOLD_RED_COL);
-
-    if (error & NULL_POINTER_SPU)
-        printf ("Null pointer\n");
-    if (error & STACK_ERR)
+    if (error.err_code == STACK_ERR)
+    {
         STACK_DUMP(sp->stk, stack_verify (sp->stk));
-    if (error & RUBBISH_SPU)
-        printf ("Rubbish in spu\n");
-    if (error & MEM_ALLOC_ERR_SPU)
-        printf ("Error of allocation memory\n");
-    if (error & OPEN_FILE_ERR)
-        printf ("Error is in opening file\n");
-    if (error & INPUT_NUM_ERR)
-        printf ("Incorrect input data\n");
-    if (error & SYNTAX_ERR)
-        printf ("Error is in syntax\n");
-    if (error & VERSION_ERR)
-        printf ("Error is in version of programm\n");
-    if (error & SIGNATURE_ERR)
-        printf ("Error is in signature of programm\n");
-    if (error & VERIFY_ERR)
-        printf ("Error is in verifying of spu\n");
+    }
+    else
+    {
+        printf ("%s\n"
+                "In file: %s, function: %s, line: %d",
+                error.err_message, error.err_file, error.err_func, error.err_line);
+    }
     printf (OFF_COL);
 }
 
-int execute (Spu* sp)
+Error execute (Spu* sp)
 {
-    int error = spu_verify (sp);
-    if (error != 0)
+    Error error = spu_verify (sp);
+    if (error.err_code != CORRECT)
     {
         spu_dump (sp, error);
-        return VERIFY_ERR;
+        RETURN_ERROR(VERIFY_ERR, "Error in verifying of spu\n");
     }
 
     int i = 0;
@@ -227,11 +231,10 @@ int execute (Spu* sp)
         switch (command & CODE_COMMAND_MASK)
         {
             case HLT:
-                return error;
-                break;
+                RETURN_ERROR(CORRECT, "");
             case OUT:
                 if (stack_pop (sp->stk, &number) != 0)
-                    return SYNTAX_ERR;
+                    RETURN_ERROR(SYNTAX_ERR, "Pop from empty stack");
                 else
                     printf ("%lf\n", (double) number / PRECISION);
                 break;
@@ -240,47 +243,47 @@ int execute (Spu* sp)
                 if (scanf ("%lf", &num_double) == 1)
                     stack_push (sp->stk, (int) (num_double * PRECISION));
                 else
-                    return INPUT_NUM_ERR;
+                    RETURN_ERROR(INPUT_NUM_ERR, "Error with input data");
                 break;
             case DIV:
                 if (stack_pop (sp->stk, &number) + stack_pop (sp->stk, &number1) != 0)
-                    return SYNTAX_ERR;
+                    RETURN_ERROR(SYNTAX_ERR, "Pop from empty stack");
                 else
                     stack_push (sp->stk, (int) (((double) number1 / (double) number) * PRECISION));
                 break;
             case SUB:
                 if (stack_pop (sp->stk, &number) + stack_pop (sp->stk, &number1) != 0)
-                    return SYNTAX_ERR;
+                    RETURN_ERROR(SYNTAX_ERR, "Pop from empty stack");
                 else
                     stack_push (sp->stk, number1 - number);
                 break;
             case MUL:
                 if (stack_pop (sp->stk, &number) + stack_pop (sp->stk, &number1) != 0)
-                    return SYNTAX_ERR;
+                    RETURN_ERROR(SYNTAX_ERR, "Pop from empty stack");
                 else
                     stack_push (sp->stk, number * number1 / PRECISION);
                 break;
             case ADD:
                 if (stack_pop (sp->stk, &number) + stack_pop (sp->stk, &number1) != 0)
-                    return SYNTAX_ERR;
+                    RETURN_ERROR(SYNTAX_ERR, "Pop from empty stack");
                 else
                     stack_push (sp->stk, number + number1);
                 break;
             case SQRT:
                 if (stack_pop (sp->stk, &number) != 0)
-                    return SYNTAX_ERR;
+                    RETURN_ERROR(SYNTAX_ERR, "Pop from empty stack");
                 else
                     stack_push (sp->stk, (int) (sqrt ((double) number / PRECISION) * PRECISION));
                 break;
             case SIN:
                 if (stack_pop (sp->stk, &number) != 0)
-                    return SYNTAX_ERR;
+                    RETURN_ERROR(SYNTAX_ERR, "Pop from empty stack");
                 else
                     stack_push (sp->stk, (int) (sin ((double) number / PRECISION * PI / 180) * PRECISION));
                 break;
             case COS:
                 if (stack_pop (sp->stk, &number) != 0)
-                    return SYNTAX_ERR;
+                    RETURN_ERROR(SYNTAX_ERR, "Pop from empty stack");
                 else
                     stack_push (sp->stk, (int) (cos ((double) number / PRECISION * PI / 180) * PRECISION));
                 break;
@@ -294,22 +297,28 @@ int execute (Spu* sp)
                 else if (command & BIT_REGISTER)
                 {
                     number = (sp->code)[i];
-                    if (number == 1)
-                        number = sp->rax;
-                    else if (number == 2)
-                        number = sp->rbx;
-                    else if (number == 3)
-                        number = sp->rcx;
-                    else if (number == 4)
-                        number = sp->rdx;
-                    else
-                        return SYNTAX_ERR;
-
+                    switch (number)
+                    {
+                        case 1:
+                            number = sp->rax;
+                            break;
+                        case 2:
+                            number = sp->rbx;
+                            break;
+                        case 3:
+                            number = sp->rcx;
+                            break;
+                        case 4:
+                            number = sp->rdx;
+                            break;
+                        default:
+                            RETURN_ERROR(SYNTAX_ERR, "Incorrect name of register");
+                    }
                     stack_push (sp->stk, number);
                 }
                 else
                 {
-                    return SYNTAX_ERR;
+                    RETURN_ERROR(SYNTAX_ERR, "Error in syntax");
                 }
                 break;
             case POP:
@@ -317,36 +326,50 @@ int execute (Spu* sp)
                 if (command & BIT_REGISTER)
                 {
                     number = (sp->code)[i];
-                    if (number == 1)
-                        stack_pop (sp->stk, &(sp->rax));
-                    else if (number == 2)
-                        stack_pop (sp->stk, &(sp->rbx));
-                    else if (number == 3)
-                        stack_pop (sp->stk, &(sp->rcx));
-                    else if (number == 4)
-                        stack_pop (sp->stk, &(sp->rdx));
+                    int tmp = 0;
+                    if (stack_pop (sp->stk, &tmp) != 0)
+                    {
+                        RETURN_ERROR(SYNTAX_ERR, "Pop from empty stack");
+                    }
                     else
-                        return SYNTAX_ERR;
+                    {
+                        switch (number)
+                        {
+                            case 1:
+                                sp->rax = tmp;
+                                break;
+                            case 2:
+                                sp->rbx = tmp;
+                                break;
+                            case 3:
+                                sp->rcx = tmp;
+                                break;
+                            case 4:
+                                sp->rdx = tmp;
+                                break;
+                            default:
+                                RETURN_ERROR(SYNTAX_ERR, "Incorrect name of register");
+                        }
+                    }
                 }
                 else
                 {
-                    return SYNTAX_ERR;
+                    RETURN_ERROR(SYNTAX_ERR, "Error in syntax");
                 }
                 break;
             default:
-                puts ("AAA");
-                return SYNTAX_ERR;
+                RETURN_ERROR(SYNTAX_ERR, "Incorrect code of command");
                 break;
         }
         i++;
     }
-    return error;
+    RETURN_ERROR(CORRECT, "");
 }
 
-int spu_ctor (Spu* sp, int num_commands, const char* name, const char* file, const char* func, int line)
+Error spu_ctor (Spu* sp, int num_commands, const char* name, const char* file, const char* func, int line)
 {
     if (!sp)
-        return NULL_POINTER_SPU;
+        RETURN_ERROR(NULL_POINTER_SPU, "Null pointer of spu");
 
     int error = 0;
     if (MAKE_STACK(&(sp->stk)) != 0)
@@ -365,15 +388,16 @@ int spu_ctor (Spu* sp, int num_commands, const char* name, const char* file, con
 
     sp->code = (int*) calloc (num_commands + 1, sizeof (int));
     if (!sp->code)
-        error |= MEM_ALLOC_ERR_SPU;
+        RETURN_ERROR(MEM_ALLOC_ERR_SPU, "Error in memory allocation of array of commands");
 
-    return error;
+    RETURN_ERROR(CORRECT, "");
 }
 
-int spu_dtor (Spu** sp)
+Error spu_dtor (Spu** sp)
 {
     if (!sp || !(*sp))
-        return NULL_POINTER_SPU;
+        RETURN_ERROR(NULL_POINTER_SPU, "Null pointer of spu");
+
     delete_stack (&((*sp)->stk));
     (*sp)->rax = INT_MAX;
     (*sp)->rbx = INT_MAX;
@@ -389,21 +413,19 @@ int spu_dtor (Spu** sp)
     (*sp)->code = NULL;
     free (*sp);
     *sp = NULL;
-    return 0;
+    RETURN_ERROR(CORRECT, "");
 }
 
-int spu_verify (Spu* sp)
+Error spu_verify (Spu* sp)
 {
-    int error = 0;
-    if (!sp)
-        return NULL_POINTER_SPU;
-    if (stack_verify (sp->stk) != 0)                                                                error |= STACK_ERR;
-    if (sp->rax == INT_MAX || sp->rbx == INT_MAX || sp->rcx == INT_MAX || sp->rbx == INT_MAX)       error |= RUBBISH_SPU;
-    if (!(sp->code) || !(sp->file) || !(sp->func) || !(sp->name))                                   error |= NULL_POINTER_SPU;
-    return error;
+    if (!sp)                                                                                    RETURN_ERROR(NULL_POINTER_SPU, "Null pointer of spu");
+    if (stack_verify (sp->stk) != 0)                                                            RETURN_ERROR(STACK_ERR, "Error with stack");
+    if (sp->rax == INT_MAX || sp->rbx == INT_MAX || sp->rcx == INT_MAX || sp->rbx == INT_MAX)   RETURN_ERROR(RUBBISH_SPU, "Rubbish in registers");
+    if (!(sp->code) || !(sp->file) || !(sp->func) || !(sp->name))                               RETURN_ERROR(NULL_POINTER_SPU, "Null pointer of elements in spu");
+    RETURN_ERROR(CORRECT, "");
 }
 
-void spu_dump (Spu* sp, int error)
+void spu_dump (Spu* sp, Error error)
 {
     printf (RED_COL);
     if (!sp)
