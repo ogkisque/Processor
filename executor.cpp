@@ -205,7 +205,7 @@ void print_error_spu (Spu* sp, Error error)
     else
     {
         printf ("%s\n"
-                "In file: %s, function: %s, line: %d",
+                "In file: %s, function: %s, line: %d\n",
                 error.err_message, error.err_file, error.err_func, error.err_line);
     }
     printf (OFF_COL);
@@ -225,144 +225,26 @@ Error execute (Spu* sp)
     int number = 0;
     int number1 = 0;
     double num_double = 0.0;
-    while (i < sp->num_comm)
+
+    #define DEF_CMD(name, num, args, ...)   \
+            case CMD_##name:                \
+                __VA_ARGS__;                \
+                break;
+
+    while (sp->ip < sp->num_comm)
     {
-        command = (sp->code)[i];
+        command = (sp->code)[sp->ip];
         switch (command & CODE_COMMAND_MASK)
         {
-            case HLT:
-                RETURN_ERROR(CORRECT, "");
-            case OUT:
-                if (stack_pop (sp->stk, &number) != 0)
-                    RETURN_ERROR(SYNTAX_ERR, "Pop from empty stack");
-                else
-                    printf ("%lf\n", (double) number / PRECISION);
-                break;
-            case IN:
-                printf ("Enter the number: ");
-                if (scanf ("%lf", &num_double) == 1)
-                    stack_push (sp->stk, (int) (num_double * PRECISION));
-                else
-                    RETURN_ERROR(INPUT_NUM_ERR, "Error with input data");
-                break;
-            case DIV:
-                if (stack_pop (sp->stk, &number) + stack_pop (sp->stk, &number1) != 0)
-                    RETURN_ERROR(SYNTAX_ERR, "Pop from empty stack");
-                else
-                    stack_push (sp->stk, (int) (((double) number1 / (double) number) * PRECISION));
-                break;
-            case SUB:
-                if (stack_pop (sp->stk, &number) + stack_pop (sp->stk, &number1) != 0)
-                    RETURN_ERROR(SYNTAX_ERR, "Pop from empty stack");
-                else
-                    stack_push (sp->stk, number1 - number);
-                break;
-            case MUL:
-                if (stack_pop (sp->stk, &number) + stack_pop (sp->stk, &number1) != 0)
-                    RETURN_ERROR(SYNTAX_ERR, "Pop from empty stack");
-                else
-                    stack_push (sp->stk, number * number1 / PRECISION);
-                break;
-            case ADD:
-                if (stack_pop (sp->stk, &number) + stack_pop (sp->stk, &number1) != 0)
-                    RETURN_ERROR(SYNTAX_ERR, "Pop from empty stack");
-                else
-                    stack_push (sp->stk, number + number1);
-                break;
-            case SQRT:
-                if (stack_pop (sp->stk, &number) != 0)
-                    RETURN_ERROR(SYNTAX_ERR, "Pop from empty stack");
-                else
-                    stack_push (sp->stk, (int) (sqrt ((double) number / PRECISION) * PRECISION));
-                break;
-            case SIN:
-                if (stack_pop (sp->stk, &number) != 0)
-                    RETURN_ERROR(SYNTAX_ERR, "Pop from empty stack");
-                else
-                    stack_push (sp->stk, (int) (sin ((double) number / PRECISION * PI / 180) * PRECISION));
-                break;
-            case COS:
-                if (stack_pop (sp->stk, &number) != 0)
-                    RETURN_ERROR(SYNTAX_ERR, "Pop from empty stack");
-                else
-                    stack_push (sp->stk, (int) (cos ((double) number / PRECISION * PI / 180) * PRECISION));
-                break;
-            case PUSH:
-                i++;
-                if (command & BIT_IMM_CONST)
-                {
-                    number = (sp->code)[i];
-                    stack_push (sp->stk, number);
-                }
-                else if (command & BIT_REGISTER)
-                {
-                    number = (sp->code)[i];
-                    switch (number)
-                    {
-                        case 1:
-                            number = sp->rax;
-                            break;
-                        case 2:
-                            number = sp->rbx;
-                            break;
-                        case 3:
-                            number = sp->rcx;
-                            break;
-                        case 4:
-                            number = sp->rdx;
-                            break;
-                        default:
-                            RETURN_ERROR(SYNTAX_ERR, "Incorrect name of register");
-                    }
-                    stack_push (sp->stk, number);
-                }
-                else
-                {
-                    RETURN_ERROR(SYNTAX_ERR, "Error in syntax");
-                }
-                break;
-            case POP:
-                i++;
-                if (command & BIT_REGISTER)
-                {
-                    number = (sp->code)[i];
-                    int tmp = 0;
-                    if (stack_pop (sp->stk, &tmp) != 0)
-                    {
-                        RETURN_ERROR(SYNTAX_ERR, "Pop from empty stack");
-                    }
-                    else
-                    {
-                        switch (number)
-                        {
-                            case 1:
-                                sp->rax = tmp;
-                                break;
-                            case 2:
-                                sp->rbx = tmp;
-                                break;
-                            case 3:
-                                sp->rcx = tmp;
-                                break;
-                            case 4:
-                                sp->rdx = tmp;
-                                break;
-                            default:
-                                RETURN_ERROR(SYNTAX_ERR, "Incorrect name of register");
-                        }
-                    }
-                }
-                else
-                {
-                    RETURN_ERROR(SYNTAX_ERR, "Error in syntax");
-                }
-                break;
+            #include "code_generate.h"
             default:
                 RETURN_ERROR(SYNTAX_ERR, "Incorrect code of command");
                 break;
         }
-        i++;
+        (sp->ip)++;
     }
+
+    #undef DEF_CMD
     RETURN_ERROR(CORRECT, "");
 }
 

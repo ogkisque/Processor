@@ -50,20 +50,14 @@ const Command COMMANDS_LIST[] = {
             {11, "pop", REG_ARG}
 };
 
+#define DEF_CMD(name, num, ...) \
+        CMD_##name = num,
+
 enum Commands
 {
-    HLT =    0,
-    PUSH =   1,
-    DIV =    2,
-    SUB =    3,
-    MUL =    4,
-    ADD =    5,
-    SQRT =   6,
-    SIN =    7,
-    COS =    8,
-    OUT =    9,
-    IN =     10,
-    POP =    11
+    #include "code_generate.h"
 };
+
+#undef DEF_CMD
 
 #endif //COMMANDS_HEADER
