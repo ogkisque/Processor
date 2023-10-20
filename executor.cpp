@@ -76,39 +76,32 @@ void print_error_spu (Spu* sp, Error error);
 Error spu_ctor (Spu* sp, int num_commands, const char* name, const char* file, const char* func, int line);
 Error spu_dtor (Spu* sp);
 Error spu_verify (Spu* sp);
+Error check_header (File_Header* header, Spu* sp);
 void spu_dump (Spu* sp, Error error);
+bool parse_cmd_args (char file_name_read[], int argc, char* argv[]);
+bool check_type_file (char file_name_read[]);
 
 int main (int argc, char* argv[])
 {
     char file_name_read[MAX_NAME_LEN] = "";
-    char bin_file_name_read[MAX_NAME_LEN] = "";
-    if (argc < 3)
+    bool is_txt_file = parse_cmd_args (file_name_read, argc, argv);
+
+    Error error = {};
+    Spu sp = {};
+    if (is_txt_file)
     {
-        strcpy (bin_file_name_read, BIN_FILE_NAME_READ_DEF);
-        strcpy (file_name_read, FILE_NAME_READ_DEF);
+        printf ("With .txt file\n");
+        error = read_txt_byte_code (file_name_read, &sp);
     }
     else
     {
-        strcpy (file_name_read, argv[1]);
-        strcpy (bin_file_name_read, argv[2]);
+        printf ("With .bin file\n");
+        error = read_bin_byte_code (file_name_read, &sp);
     }
+    PARSE_ERROR(&sp, error);
 
-    Error error = {};
-#ifdef TXT_BYTE_CODE
-    printf ("With .txt file\n");
-    Spu sp1 = {};
-    error = read_txt_byte_code (file_name_read, &sp1);
-    PARSE_ERROR(&sp1, error);
-    error = execute (&sp1);
-    PARSE_ERROR(&sp1, error);
-#endif
-
-    printf ("With .bin file\n");
-    Spu sp2 = {};
-    error = read_bin_byte_code (bin_file_name_read, &sp2);
-    PARSE_ERROR(&sp2, error);
-    error = execute (&sp2);
-    PARSE_ERROR(&sp2, error);
+    error = execute (&sp);
+    PARSE_ERROR(&sp, error);
 
     return 0;
 }
@@ -125,14 +118,9 @@ Error read_bin_byte_code (char* file_name_read, Spu* sp)
     File_Header header = {};
     fread (&header, sizeof (header), 1, file_read);
 
-    if (strcmp (header.signature, SIGNATURE) != 0)
-        RETURN_ERROR(SIGNATURE_ERR, "Incorrect signature");
-    if (header.version != VERSION)
-        RETURN_ERROR(VERSION_ERR, "Incorrect version");
-
-    Error error = SPU_CTOR(sp, header.num_commands);
+    Error error = check_header (&header, sp);
     if (error.err_code != CORRECT)
-        spu_dump (sp, error);
+        return error;
 
     fread (sp->code, sizeof (int), header.num_commands, file_read);
 
@@ -151,42 +139,20 @@ Error read_txt_byte_code (char* file_name_read, Spu* sp)
         RETURN_ERROR(OPEN_FILE_ERR, "Error of opening file\n");
 
     char str[MAX_COMMAND_LEN] = "";
+
+    File_Header header = {};
+    fscanf (file_read, "%s", header.signature);
+    fscanf (file_read, "%d", &(header.version));
+    fscanf (file_read, "%d", &(header.num_commands));
+    Error error = check_header (&header, sp);
+    if (error.err_code != CORRECT)
+        return error;
+
     int number = 0;
     int i = 0;
-    while (fscanf (file_read, "%s", str) == 1)
+    while (fscanf (file_read, "%d", &number) == 1)
     {
-        if (i == 0)
-        {
-            if (strcmp (str, SIGNATURE) != 0)
-                RETURN_ERROR(SIGNATURE_ERR, "Incorrect signature");
-        }
-        else
-        {
-            if (sscanf (str, "%d", &number) != 1)
-            {
-                RETURN_ERROR(SYNTAX_ERR, "Error in syntax");
-            }
-            else
-            {
-                if (i == 1)
-                {
-                    if (number != VERSION)
-                        RETURN_ERROR(VERSION_ERR, "Incorrect version");
-                }
-                else if (i == 2)
-                {
-                    if (number < 0)
-                        RETURN_ERROR(SYNTAX_ERR, "Negative number of commands");
-                    Error err = SPU_CTOR(sp, number);
-                    if (err.err_code != CORRECT)
-                        spu_dump (sp, err);
-                }
-                else
-                {
-                    sp->code[i - 3] = number;
-                }
-            }
-        }
+        sp->code[i] = number;
         i++;
     }
 
@@ -233,7 +199,9 @@ Error execute (Spu* sp)
 
     while (sp->ip < sp->num_comm)
     {
+        //printf ("%d\n", sp->ip);
         command = (sp->code)[sp->ip];
+        //spu_dump (sp, error);
         switch (command & CODE_COMMAND_MASK)
         {
             #include "code_generate.h"
@@ -245,6 +213,7 @@ Error execute (Spu* sp)
     }
 
     #undef DEF_CMD
+
     RETURN_ERROR(CORRECT, "");
 }
 
@@ -307,6 +276,20 @@ Error spu_verify (Spu* sp)
     RETURN_ERROR(CORRECT, "");
 }
 
+Error check_header (File_Header* header, Spu* sp)
+{
+    if (strcmp (header->signature, SIGNATURE) != 0)
+        RETURN_ERROR(SIGNATURE_ERR, "Incorrect signature");
+    if (header->version != VERSION)
+        RETURN_ERROR(VERSION_ERR, "Incorrect version");
+
+    Error error = SPU_CTOR(sp, header->num_commands);
+    if (error.err_code != CORRECT)
+        spu_dump (sp, error);
+
+    RETURN_ERROR(CORRECT, "");
+}
+
 void spu_dump (Spu* sp, Error error)
 {
     printf (RED_COL);
@@ -326,6 +309,10 @@ void spu_dump (Spu* sp, Error error)
     for (int i = 0; i < sp->num_comm; i++)
     {
         if (i < 10)
+            printf ("000%d ", i);
+        else if (i < 100)
+            printf ("00%d ", i);
+        else if (i < 1000)
             printf ("0%d ", i);
         else
             printf ("%d ", i);
@@ -334,13 +321,42 @@ void spu_dump (Spu* sp, Error error)
     for (int i = 0; i < sp->num_comm; i++)
     {
         if ((sp->code)[i] < 10)
+            printf ("%d    ", (sp->code)[i]);
+        else if ((sp->code)[i] < 100)
+            printf ("%d   ", (sp->code)[i]);
+        else if ((sp->code)[i] < 1000)
             printf ("%d  ", (sp->code)[i]);
         else
             printf ("%d ", (sp->code)[i]);
     }
     printf ("\n");
     for (int i = 0; i < sp->ip; i++)
-        printf ("   ");
+        printf ("     ");
     printf ("^\n");
     printf (OFF_COL);
+}
+
+bool parse_cmd_args (char file_name_read[], int argc, char* argv[])
+{
+    if (argc < 2)
+    {
+        strcpy (file_name_read, BIN_FILE_NAME_READ_DEF);
+        return false;
+    }
+    else
+    {
+        strcpy (file_name_read, argv[1]);
+        return check_type_file (file_name_read);
+    }
+}
+
+bool check_type_file (char file_name_read[])
+{
+    int i = 0;
+    while (file_name_read[i] != '.')
+        i++;
+
+    if (strncmp (file_name_read + i + 1, "txt", 3) == 0)
+        return true;
+    return false;
 }
