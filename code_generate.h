@@ -177,7 +177,7 @@ DEF_CMD(pop,  11, REG_ARG,
             }
         })
 
-DEF_CMD(jump, 12, LABEL,
+DEF_CMD(jmp, 12, LABEL,
         {
             sp->ip = (sp->code)[sp->ip + 1] - 1;
         })

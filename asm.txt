@@ -1,6 +1,11 @@
+in
+pop rbx
 push 1
 pop rax
 :next
+push rax
+push rbx
+ja stop
 push rax
 push rax
 mul
@@ -9,7 +14,9 @@ push rax
 push 1
 add
 pop rax
-push rax
-push 10
-jb next
+jmp next
+:stop
+in
+sqrt
+out
 hlt

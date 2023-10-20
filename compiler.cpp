@@ -86,9 +86,9 @@ int main (int argc, char* argv[])
     labels_struct.need_recompile = false;
     Errors error = get_commands_arr (file_name_read, &commands_struct, &labels_struct);
     PARSE_ERROR(error);
+
     if (labels_struct.need_recompile)
     {
-        puts ("QWERTYYYY");
         commands_struct = {};
         error = get_commands_arr (file_name_read, &commands_struct, &labels_struct);
         PARSE_ERROR(error);
@@ -228,7 +228,8 @@ Errors parse_command (char str[],
     }
     if (!is_read_command)
         return SYNTAX_ERR;
-    return CORRECT;
+
+    return error;
 }
 
 Errors parse_arg (char str[],
