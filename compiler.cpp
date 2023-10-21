@@ -244,7 +244,7 @@ Errors parse_arg (char str[],
         return SYNTAX_ERR;
 
     if ((strlen (arg) == 3) &&
-        (arg[0] == 'r' && arg[2] == 'x' && arg[1] >= 'a' && arg[1] <= 'd'))
+        (arg[0] == 'r' && ('a' <= arg[1] && arg[1] <= 'd') && arg[2] == 'x'))
     {
         (commands_struct->commands)[commands_struct->num_commands] |= BIT_REGISTER;
         (commands_struct->num_commands)++;
@@ -258,7 +258,7 @@ Errors parse_arg (char str[],
         (commands_struct->commands)[commands_struct->num_commands] = (int) (number * PRECISION);
         *arg_type_real = NUM_ARG;
     }
-    else
+    else //label
     {
         int pos = -1;
         (commands_struct->num_commands)++;
@@ -295,9 +295,9 @@ Errors print_commands_bin (const char* name_file_print,
     FILE* file_print = fopen (name_file_print, "wb");
     if (!file_print)
         return OPEN_FILE_ERR;
-
-    fwrite (header, sizeof (File_Header), 1, file_print);
-    fwrite (commands_int, sizeof (int), header->num_commands, file_print);
+    //errors
+    fwrite (header,       sizeof (File_Header), 1,                    file_print);
+    fwrite (commands_int, sizeof (int),         header->num_commands, file_print);
 
     fclose (file_print);
     return CORRECT;

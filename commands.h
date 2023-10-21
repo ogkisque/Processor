@@ -11,7 +11,7 @@ const int MAX_NAME_LEN = 40;
 const int PRECISION = 100;
 const int MAX_COMMAND_LEN = 20;
 const int CODE_COMMAND_MASK = 0x00FF;
-const int NUM_OF_COMMANDS = 19;
+const int NUM_OF_COMMANDS = 21;
 const int NUM_OF_LABELS = 20;
 
 enum Arg_Types

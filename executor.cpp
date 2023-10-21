@@ -30,6 +30,7 @@ struct Error
 struct Spu
 {
     Stack* stk;
+    Stack* ret_adrs;
     int rax;
     int rbx;
     int rcx;
@@ -167,6 +168,7 @@ void print_error_spu (Spu* sp, Error error)
     if (error.err_code == STACK_ERR)
     {
         STACK_DUMP(sp->stk, stack_verify (sp->stk));
+        STACK_DUMP(sp->ret_adrs, stack_verify (sp->ret_adrs));
     }
     else
     {
@@ -199,9 +201,7 @@ Error execute (Spu* sp)
 
     while (sp->ip < sp->num_comm)
     {
-        //printf ("%d\n", sp->ip);
         command = (sp->code)[sp->ip];
-        //spu_dump (sp, error);
         switch (command & CODE_COMMAND_MASK)
         {
             #include "code_generate.h"
@@ -224,6 +224,8 @@ Error spu_ctor (Spu* sp, int num_commands, const char* name, const char* file, c
 
     int error = 0;
     if (MAKE_STACK(&(sp->stk)) != 0)
+        error |= STACK_ERR;
+    if (MAKE_STACK(&(sp->ret_adrs)) != 0)
         error |= STACK_ERR;
 
     sp->rax = 0;
@@ -250,6 +252,7 @@ Error spu_dtor (Spu** sp)
         RETURN_ERROR(NULL_POINTER_SPU, "Null pointer of spu");
 
     delete_stack (&((*sp)->stk));
+    delete_stack (&((*sp)->ret_adrs));
     (*sp)->rax = INT_MAX;
     (*sp)->rbx = INT_MAX;
     (*sp)->rcx = INT_MAX;
@@ -271,6 +274,7 @@ Error spu_verify (Spu* sp)
 {
     if (!sp)                                                                                    RETURN_ERROR(NULL_POINTER_SPU, "Null pointer of spu");
     if (stack_verify (sp->stk) != 0)                                                            RETURN_ERROR(STACK_ERR, "Error with stack");
+    if (stack_verify (sp->ret_adrs) != 0)                                                       RETURN_ERROR(STACK_ERR, "Error with stack of return adresses");
     if (sp->rax == INT_MAX || sp->rbx == INT_MAX || sp->rcx == INT_MAX || sp->rbx == INT_MAX)   RETURN_ERROR(RUBBISH_SPU, "Rubbish in registers");
     if (!(sp->code) || !(sp->file) || !(sp->func) || !(sp->name))                               RETURN_ERROR(NULL_POINTER_SPU, "Null pointer of elements in spu");
     RETURN_ERROR(CORRECT, "");
@@ -304,6 +308,7 @@ void spu_dump (Spu* sp, Error error)
     print_error_spu (sp, error);
     printf (RED_COL);
     print_stack (sp->stk);
+    print_stack (sp->ret_adrs);
     printf ("rax = %d, rbx = %d, rcx = %d, rdx = %d\n",
             sp->rax, sp->rbx, sp->rcx, sp->rdx);
     for (int i = 0; i < sp->num_comm; i++)

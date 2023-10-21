@@ -1,5 +1,7 @@
 #define DO_PUSH(num) stack_push (sp->stk, num)
 #define DO_POP(num_p) stack_pop (sp->stk, num_p)
+#define DO_PUSH_RET_ADRS(num) stack_push (sp->ret_adrs, num)
+#define DO_POP_RET_ADRS(num_p) stack_pop (sp->ret_adrs, num_p)
 #define MAKE_CMD_JUMP(name, num, type_cmp)                                  \
         DEF_CMD(name, num, LABEL,                                           \
                 {                                                           \
@@ -177,7 +179,7 @@ DEF_CMD(pop,  11, REG_ARG,
             }
         })
 
-DEF_CMD(jmp, 12, LABEL,
+DEF_CMD(jmp,  12, LABEL,
         {
             sp->ip = (sp->code)[sp->ip + 1] - 1;
         })
@@ -188,3 +190,18 @@ MAKE_CMD_JUMP(jb,  15, <)
 MAKE_CMD_JUMP(jbe, 16, <=)
 MAKE_CMD_JUMP(je,  17, ==)
 MAKE_CMD_JUMP(jne, 18, !=)
+
+DEF_CMD(call, 19, LABEL,
+        {
+            DO_PUSH_RET_ADRS(sp->ip + 2);
+            sp->ip = (sp->code)[sp->ip + 1] - 1;
+        })
+
+DEF_CMD(ret,  20, NO_ARG,
+        {
+            int err1 = DO_POP_RET_ADRS(&number);
+            if (err1 != 0)
+                RETURN_ERROR(SYNTAX_ERR, "Pop from empty stack of labels");
+            else
+                sp->ip = number - 1;
+        })

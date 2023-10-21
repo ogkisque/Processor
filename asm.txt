@@ -1,22 +1,24 @@
-in
+jmp main
+:discr
+pop rcx
 pop rbx
-push 1
 pop rax
-:next
-push rax
 push rbx
-ja stop
-push rax
-push rax
+push rbx
 mul
-out
+push 4
 push rax
-push 1
-add
+push rcx
+mul
+mul
+sub
 pop rax
-jmp next
-:stop
+ret
+:main
 in
-sqrt
+in
+in
+call discr
+push rax
 out
 hlt
