@@ -3,21 +3,44 @@
 #include <stdlib.h>
 
 #include "commands.h"
+#include "colors.h"
 
-#define PARSE_ERROR(error)          \
-        if (error != CORRECT)       \
-        {                           \
-            print_error (error);    \
-            return error;           \
+#define PARSE_ERROR(error)                  \
+        if (error.err_code != CORRECT)      \
+        {                                   \
+            return error;                   \
         }
 
-enum Errors
+#define PARSE_ERROR_MAIN(error)             \
+        if (error.err_code != CORRECT)      \
+        {                                   \
+            print_error_asm (error);        \
+            return 1;                       \
+        }
+
+#define RETURN_ERROR(code, line_asm, message) \
+        return Error {code, __LINE__, line_asm, file_name_read, __FILE__, __func__, message}
+
+enum Errors_asm
 {
-    CORRECT =      -1,
-    OPEN_FILE_ERR = 1,
-    SYNTAX_ERR    = 2,
-    MEM_ALLOC_ERR = 3,
-    NULL_POINTER =  4
+    CORRECT =       -1,
+    OPEN_FILE_ERR =  1,
+    SYNTAX_ERR    =  2,
+    MEM_ALLOC_ERR =  3,
+    NULL_POINTER =   4,
+    WRITE_FILE_ERR = 5,
+    UNKNOWN_LABEL =  6
+};
+
+struct Error
+{
+    Errors_asm err_code;
+    int err_line;
+    int err_line_asm;
+    const char* asm_file;
+    const char* err_file;
+    const char* err_func;
+    const char* err_message;
 };
 
 struct Label_Var
@@ -38,6 +61,7 @@ struct Commands_Arr
     int* commands;
     int num_commands;
     int capacity;
+    int str_asm;
 };
 
 const int REALLOC_STEP = 10;
@@ -45,38 +69,39 @@ const char* FILE_NAME_READ_DEF = "asm.txt";
 const char* FILE_NAME_PRINT_DEF = "byte_code.txt";
 const char* BIN_FILE_NAME_PRINT_DEF = "byte_code.bin";
 
-Errors get_commands_arr (const char* name_file_read,
+char file_name_read[MAX_NAME_LEN] = "";
+
+Error get_commands_arr (const char* name_file_read,
                          Commands_Arr* commands_struct,
                          Label_Arr* labels_struct);
-Errors parse_command (char str[],
+Error parse_command (char str[],
                       Commands_Arr* commands_struct,
                       Label_Arr* labels_struct);
-Errors parse_arg (char str[],
+Error parse_arg (char str[],
                   Commands_Arr* commands_struct,
                   Label_Arr* labels_struct,
                   Arg_Types* arg_type_real);
 int found_label (char arg[], Label_Arr* labels_struct);
 #ifdef TXT_BYTE_CODE
-Errors print_commands_txt (const char* name_file_print,
+Error print_commands_txt (const char* name_file_print,
                            int* commands_int,
                            File_Header* header);
 #endif
-Errors print_commands_bin (const char* name_file_print,
+Error print_commands_bin (const char* name_file_print,
                            int* commands_int,
                            File_Header* header);
-Errors header_ctor (File_Header* header, int num_comm);
+Error header_ctor (File_Header* header, int num_comm);
 void parse_cmd_args (int argc,
                      char* argv[],
                      char bin_file_name_print[],
                      char file_name_read[],
                      char file_name_print[]);
-void print_error (Errors error);
+void print_error_asm (Error error);
 void del_comment (char* str);
 void del_slash_n (char* str);
 
 int main (int argc, char* argv[])
 {
-    char file_name_read[MAX_NAME_LEN] = "";
     char file_name_print[MAX_NAME_LEN] = "";
     char bin_file_name_print[MAX_NAME_LEN] = "";
     parse_cmd_args (argc, argv, bin_file_name_print, file_name_read, file_name_print);
@@ -84,14 +109,21 @@ int main (int argc, char* argv[])
     Commands_Arr commands_struct = {};
     Label_Arr labels_struct = {};
     labels_struct.need_recompile = false;
-    Errors error = get_commands_arr (file_name_read, &commands_struct, &labels_struct);
-    PARSE_ERROR(error);
+    Error error = get_commands_arr (file_name_read, &commands_struct, &labels_struct);
+    PARSE_ERROR_MAIN(error);
 
     if (labels_struct.need_recompile)
     {
+        labels_struct.need_recompile = false;
         commands_struct = {};
         error = get_commands_arr (file_name_read, &commands_struct, &labels_struct);
-        PARSE_ERROR(error);
+        PARSE_ERROR_MAIN(error);
+    }
+
+    if (labels_struct.need_recompile)
+    {
+        print_error_asm (Error {UNKNOWN_LABEL, __LINE__, -1, file_name_read, __FILE__, __func__, "Unknown label."});
+        return 1;
     }
 
     File_Header header = {};
@@ -99,57 +131,48 @@ int main (int argc, char* argv[])
 
 #ifdef TXT_BYTE_CODE
     error = print_commands_txt (file_name_print, commands_struct.commands, &header);
-    PARSE_ERROR(error);
+    PARSE_ERROR_MAIN(error);
 #endif
 
     error = print_commands_bin (bin_file_name_print, commands_struct.commands, &header);
-    PARSE_ERROR(error);
+    PARSE_ERROR_MAIN(error);
+
+    printf (GREEN_COL "Correct compilation\n" OFF_COL);
     return 0;
 }
 
-void print_error (Errors error)
+void print_error_asm (Error error)
 {
-    switch (error)
-    {
-    case OPEN_FILE_ERR:
-        printf ("Error is in opening file\n");
-        break;
-    case SYNTAX_ERR:
-        printf ("Error is in syntax\n");
-        break;
-    case MEM_ALLOC_ERR:
-        printf ("Error is in allocation of memory\n");
-        break;
-    case NULL_POINTER:
-        printf ("Null pointer\n");
-        break;
-    case CORRECT:
-        printf ("Correct compilation\n");
-        break;
-    default:
-        break;
-    }
+    printf (RED_COL);
+    printf ("%s Code of error = %d\n"
+            "In %s::%d\n"
+            "In file: %s, function: %s, line: %d\n",
+            error.err_message, error.err_code,
+            error.asm_file, error.err_line_asm,
+            error.err_file, error.err_func, error.err_line);
+    printf (OFF_COL);
 }
 
-Errors get_commands_arr (const char* name_file_read,
-                         Commands_Arr* commands_struct,
-                         Label_Arr* labels_struct)
+Error get_commands_arr (const char* name_file_read,
+                        Commands_Arr* commands_struct,
+                        Label_Arr* labels_struct)
 {
     if (!name_file_read || !commands_struct || !labels_struct)
-        return NULL_POINTER;
+        RETURN_ERROR(NULL_POINTER, -1, "Null pointer.");
 
     FILE* file_read = fopen (name_file_read, "r");
     if (!file_read)
-        return OPEN_FILE_ERR;
+        RETURN_ERROR(OPEN_FILE_ERR, -1, "Error in opening file.");
 
     char str[MAX_COMMAND_LEN] = "";
     commands_struct->capacity = REALLOC_STEP;
     commands_struct->commands = (int*) calloc (REALLOC_STEP, sizeof (int));
     if (!(commands_struct->commands))
-        return MEM_ALLOC_ERR;
+        RETURN_ERROR(MEM_ALLOC_ERR, -1, "Error in allocation of memory.");
 
     while (fgets (str, MAX_COMMAND_LEN, file_read))
     {
+        (commands_struct->str_asm)++;
         del_comment (str);
         del_slash_n (str);
         if (str[0] == ':')
@@ -165,83 +188,64 @@ Errors get_commands_arr (const char* name_file_read,
             commands_struct->capacity += REALLOC_STEP;
             (commands_struct->commands) = (int*) realloc ((commands_struct->commands), commands_struct->capacity * sizeof (int));
             if (!(commands_struct->commands))
-                return MEM_ALLOC_ERR;
+                RETURN_ERROR(MEM_ALLOC_ERR, -1, "Error in allocation of memory.");
         }
-        Errors error = parse_command (str, commands_struct, labels_struct);
+        Error error = parse_command (str, commands_struct, labels_struct);
         PARSE_ERROR(error);
     }
 
     fclose (file_read);
-    return CORRECT;
+    RETURN_ERROR(CORRECT, -1, "");
 }
 
-Errors parse_command (char str[],
-                      Commands_Arr* commands_struct,
-                      Label_Arr* labels_struct)
+Error parse_command (char str[],
+                     Commands_Arr* commands_struct,
+                     Label_Arr* labels_struct)
 {
     if (!str || !commands_struct || !labels_struct)
-        return NULL_POINTER;
+        RETURN_ERROR(NULL_POINTER, -1, "Null pointer.");
 
     bool is_read_command = false;
     (commands_struct->commands)[commands_struct->num_commands] = 0;
     (commands_struct->commands)[commands_struct->num_commands + 1] = 0;
     Arg_Types arg_type_real = NO_ARG;
-    Errors error = CORRECT;
+    Error error = {};
 
+    char command[MAX_COMMAND_LEN] = "";
+    sscanf (str, "%s", command);
     for (int i = 0; i < NUM_OF_COMMANDS; i++)
     {
-        if (strncmp (str, COMMANDS_LIST[i].name, strlen (COMMANDS_LIST[i].name)) ==  0)
+        if (strcmp (command, COMMANDS_LIST[i].name) ==  0)
         {
             is_read_command = true;
             (commands_struct->commands)[commands_struct->num_commands] |= COMMANDS_LIST[i].code;
-            switch (COMMANDS_LIST[i].arg_type)
-            {
-                case NO_ARG:
-                    (commands_struct->num_commands)++;
-                    break;
-                case REG_ARG:
-                    error = parse_arg (str, commands_struct, labels_struct, &arg_type_real);
-                    if (arg_type_real != REG_ARG)
-                        error = SYNTAX_ERR;
-                    break;
-                case NUM_ARG:
-                    error = parse_arg (str, commands_struct, labels_struct, &arg_type_real);
-                    if (arg_type_real != NUM_ARG)
-                        error = SYNTAX_ERR;
-                    break;
-                case NUM_OR_REG_ARG:
-                    error = parse_arg (str, commands_struct, labels_struct, &arg_type_real);
-                    if (arg_type_real != NUM_ARG && arg_type_real != REG_ARG)
-                        error = SYNTAX_ERR;
-                    break;
-                case LABEL:
-                    error = parse_arg (str, commands_struct, labels_struct, &arg_type_real);
-                    if (arg_type_real != LABEL)
-                        error = SYNTAX_ERR;
-                    break;
-                default:
-                    break;
-            }
+            error = parse_arg (str, commands_struct, labels_struct, &arg_type_real);
             PARSE_ERROR(error);
-            break;
+
+            if ((arg_type_real & COMMANDS_LIST[i].arg_type) == 0)
+                RETURN_ERROR(SYNTAX_ERR, commands_struct->str_asm, "Incorrect argument.");
         }
     }
     if (!is_read_command)
-        return SYNTAX_ERR;
+        RETURN_ERROR(SYNTAX_ERR, commands_struct->str_asm, "Incorrect command.");
 
     return error;
 }
 
-Errors parse_arg (char str[],
-                  Commands_Arr* commands_struct,
-                  Label_Arr* labels_struct,
-                  Arg_Types* arg_type_real)
+Error parse_arg (char str[],
+                 Commands_Arr* commands_struct,
+                 Label_Arr* labels_struct,
+                 Arg_Types* arg_type_real)
 {
     double number = 0.0;
     char command[MAX_COMMAND_LEN] = "";
     char arg[MAX_COMMAND_LEN] = "";
     if (sscanf (str, "%s %s", command, arg) != 2)
-        return SYNTAX_ERR;
+    {
+        *arg_type_real = NO_ARG;
+        (commands_struct->num_commands)++;
+        RETURN_ERROR(CORRECT, -1, "");
+    }
 
     if ((strlen (arg) == 3) &&
         (arg[0] == 'r' && ('a' <= arg[1] && arg[1] <= 'd') && arg[2] == 'x'))
@@ -274,7 +278,7 @@ Errors parse_arg (char str[],
         *arg_type_real = LABEL;
     }
     (commands_struct->num_commands)++;
-    return CORRECT;
+    RETURN_ERROR(CORRECT, -1, "");
 }
 
 int found_label (char arg[], Label_Arr* labels_struct)
@@ -285,35 +289,38 @@ int found_label (char arg[], Label_Arr* labels_struct)
     return -1;
 }
 
-Errors print_commands_bin (const char* name_file_print,
-                           int* commands_int,
-                           File_Header* header)
+Error print_commands_bin (const char* name_file_print,
+                          int* commands_int,
+                          File_Header* header)
 {
     if (!name_file_print || !commands_int || !header)
-        return NULL_POINTER;
+        RETURN_ERROR(NULL_POINTER, -1, "Null pointer.");
 
     FILE* file_print = fopen (name_file_print, "wb");
     if (!file_print)
-        return OPEN_FILE_ERR;
-    //errors
-    fwrite (header,       sizeof (File_Header), 1,                    file_print);
-    fwrite (commands_int, sizeof (int),         header->num_commands, file_print);
+        RETURN_ERROR(OPEN_FILE_ERR, -1, "Error in opening file.");
+
+    if (fwrite (header, sizeof (File_Header), 1, file_print) != 1)
+        RETURN_ERROR(WRITE_FILE_ERR, -1, "Error in writing header in file.");
+
+    if (fwrite (commands_int, sizeof (int), header->num_commands, file_print) != header->num_commands)
+        RETURN_ERROR(WRITE_FILE_ERR, -1, "Error in writing commands in file.");
 
     fclose (file_print);
-    return CORRECT;
+    RETURN_ERROR(CORRECT, -1, "");
 }
 
 #ifdef TXT_BYTE_CODE
-Errors print_commands_txt (const char* name_file_print,
+Error print_commands_txt (const char* name_file_print,
                            int* commands_int,
                            File_Header* header)
 {
     if (!name_file_print || !commands_int || !header)
-        return NULL_POINTER;
+        RETURN_ERROR(NULL_POINTER, -1, "Null pointer.");
 
     FILE* file_print = fopen (name_file_print, "w");
     if (!file_print)
-        return OPEN_FILE_ERR;
+        RETURN_ERROR(OPEN_FILE_ERR, -1, "Error in opening file.");
 
     fprintf (file_print, "%s\n", header->signature);
     fprintf (file_print, "%d\n", header->version);
@@ -324,7 +331,7 @@ Errors print_commands_txt (const char* name_file_print,
         fprintf (file_print, "%d\n", commands_int[i]);
     }
     fclose (file_print);
-    return CORRECT;
+    RETURN_ERROR(CORRECT, -1, "");
 }
 #endif
 
@@ -352,15 +359,15 @@ void del_slash_n (char* str)
     }
 }
 
-Errors header_ctor (File_Header* header, int num_comm)
+Error header_ctor (File_Header* header, int num_comm)
 {
     if (!header)
-        return NULL_POINTER;
+        RETURN_ERROR(NULL_POINTER, -1, "Null pointer.");
 
     strcpy (header->signature, SIGNATURE);
     header->version = VERSION;
     header->num_commands = num_comm;
-    return CORRECT;
+    RETURN_ERROR(CORRECT, -1, "");
 }
 
 void parse_cmd_args (int argc,

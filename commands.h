@@ -16,11 +16,11 @@ const int NUM_OF_LABELS = 20;
 
 enum Arg_Types
 {
-    NO_ARG =         0,
-    NUM_ARG =        1,
-    REG_ARG =        2,
-    NUM_OR_REG_ARG = 3,
-    LABEL =          4
+    NO_ARG =         1 << 0,
+    NUM_ARG =        1 << 1,
+    REG_ARG =        1 << 2,
+    NUM_OR_REG_ARG = (1 << 1 | 1 << 2),
+    LABEL =          1 << 3
 };
 
 struct File_Header
