@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <math.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "stack.h"
 #include "commands.h"
@@ -20,8 +21,8 @@
 
 struct Error
 {
-    int err_code;
-    int err_line;
+    int         err_code;
+    int         err_line;
     const char* err_file;
     const char* err_func;
     const char* err_message;
@@ -29,20 +30,21 @@ struct Error
 
 struct Spu
 {
-    Stack* stk;
-    Stack* ret_adrs;
-    int rax;
-    int rbx;
-    int rcx;
-    int rdx;
-    int num_comm;
-    int* code;
-    int ip;
+    Stack*      stk;
+    Stack*      ret_adrs;
+    int         rax;
+    int         rbx;
+    int         rcx;
+    int         rdx;
+    int         num_comm;
+    int*        code;
+    int         ip;
+    int         memory[100];
 
     const char* name;
     const char* file;
     const char* func;
-    int line;
+    int         line;
 };
 
 enum Errors_spu
@@ -60,13 +62,13 @@ enum Errors_spu
     VERIFY_ERR =        10
 };
 
-const char* FILE_NAME_READ_DEF = "byte_code.txt";
-const char* BIN_FILE_NAME_READ_DEF = "byte_code.bin";
-const int PI = 3.1415926;
-const int NUM_ERR_STACK = 1;
-const int NUM_ERR_SPU = 2;
-const int CODE_ERROR_MASK = 0x00FFFFFF;
-const int TYPE_ERROR_MASK = 0xFF000000;
+const char* FILE_NAME_READ_DEF =        "byte_code.txt";
+const char* BIN_FILE_NAME_READ_DEF =    "byte_code.bin";
+const int PI =                          3.1415926;
+const int NUM_ERR_STACK =               1;
+const int NUM_ERR_SPU =                 2;
+const int CODE_ERROR_MASK =             0x00FFFFFF;
+const int TYPE_ERROR_MASK =             0xFF000000;
 
 #ifdef TXT_BYTE_CODE
 Error read_txt_byte_code (char* file_name_read, Spu* sp);
@@ -238,6 +240,7 @@ Error spu_ctor (Spu* sp, int num_commands, const char* name, const char* file, c
     sp->file = file;
     sp->func = func;
     sp->line = line;
+    sp->memory[SIZE_MEMORY] = {0};
 
     sp->code = (int*) calloc (num_commands + 1, sizeof (int));
     if (!sp->code)
@@ -259,6 +262,7 @@ Error spu_dtor (Spu** sp)
     (*sp)->rdx = INT_MAX;
     (*sp)->ip = -1;
     (*sp)->num_comm = -1;
+    (*sp)->memory[SIZE_MEMORY] = {0};
     (*sp)->name = NULL;
     (*sp)->file = NULL;
     (*sp)->func = NULL;
@@ -297,6 +301,7 @@ Error check_header (File_Header* header, Spu* sp)
 void spu_dump (Spu* sp, Error error)
 {
     printf (RED_COL);
+    printf ("-----------------------------------------\n");
     if (!sp)
     {
         printf ("Null pointer of spu\n");
@@ -306,11 +311,19 @@ void spu_dump (Spu* sp, Error error)
     printf ("Error is in spu: name - %s, file - %s, function - %s, line - %d\n",
             sp->name, sp->file, sp->func, sp->line);
     print_error_spu (sp, error);
+
     printf (RED_COL);
+    printf ("Stack of numbers:\n");
     print_stack (sp->stk);
+
+    printf ("Stack of return adresses:\n");
     print_stack (sp->ret_adrs);
+
+    printf ("Registers:\n");
     printf ("rax = %d, rbx = %d, rcx = %d, rdx = %d\n",
             sp->rax, sp->rbx, sp->rcx, sp->rdx);
+
+    printf ("Commands list:\n");
     for (int i = 0; i < sp->num_comm; i++)
     {
         if (i < 10)
@@ -338,6 +351,12 @@ void spu_dump (Spu* sp, Error error)
     for (int i = 0; i < sp->ip; i++)
         printf ("     ");
     printf ("^\n");
+
+    printf ("Memory:\n");
+    for (int i = 0; i < SIZE_MEMORY; i++)
+        printf ("[%d] %d ", i, sp->memory[i]);
+    printf ("\n");
+    printf ("-----------------------------------------\n");
     printf (OFF_COL);
 }
 

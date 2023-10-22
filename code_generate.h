@@ -21,7 +21,7 @@ DEF_CMD(hlt,  0,  NO_ARG,
             RETURN_ERROR(CORRECT, "");
         })
 
-DEF_CMD(push, 1,  NUM_OR_REG_ARG,
+DEF_CMD(push, 1,  REG_ARG | NUM_ARG | MEM_OPER_NUM | MEM_OPER_REG,
         {
             (sp->ip)++;
             if (command & BIT_IMM_CONST)
@@ -44,6 +44,33 @@ DEF_CMD(push, 1,  NUM_OR_REG_ARG,
                         break;
                     case 4:
                         number = sp->rdx;
+                        break;
+                    default:
+                        RETURN_ERROR(SYNTAX_ERR, "Incorrect name of register");
+                }
+            }
+            else if (command & BIT_MEM_OPER_NUM)
+            {
+                usleep (TIME_SLEEP);
+                number = (sp->memory)[(sp->code)[sp->ip]];
+            }
+            else if (command & BIT_MEM_OPER_REG)
+            {
+                usleep (TIME_SLEEP);
+                number = (sp->code)[sp->ip];
+                switch (number)
+                {
+                    case 1:
+                        number = (sp->memory)[sp->rax / PRECISION];
+                        break;
+                    case 2:
+                        number = (sp->memory)[sp->rbx / PRECISION];
+                        break;
+                    case 3:
+                        number = (sp->memory)[sp->rcx / PRECISION];
+                        break;
+                    case 4:
+                        number = (sp->memory)[sp->rdx / PRECISION];
                         break;
                     default:
                         RETURN_ERROR(SYNTAX_ERR, "Incorrect name of register");
@@ -141,7 +168,7 @@ DEF_CMD(in,   10, NO_ARG,
                 RETURN_ERROR(INPUT_NUM_ERR, "Error with input data");
         })
 
-DEF_CMD(pop,  11, REG_ARG,
+DEF_CMD(pop,  11, REG_ARG | MEM_OPER_NUM | MEM_OPER_REG,
         {
             (sp->ip)++;
             if (command & BIT_REGISTER)
@@ -170,6 +197,62 @@ DEF_CMD(pop,  11, REG_ARG,
                             break;
                         default:
                             RETURN_ERROR(SYNTAX_ERR, "Incorrect name of register");
+                    }
+                }
+            }
+            else if (command & BIT_MEM_OPER_NUM)
+            {
+                usleep (TIME_SLEEP);
+                number = (sp->code)[sp->ip];
+                int tmp = 0;
+                if (DO_POP(&tmp) != 0)
+                {
+                    RETURN_ERROR(SYNTAX_ERR, "Pop from empty stack");
+                }
+                else
+                {
+                    if (0 <= number && number <= 100)
+                        (sp->memory)[number] = tmp;
+                    else
+                        RETURN_ERROR(SYNTAX_ERR, "Incorrect index of memory cell");
+                }
+            }
+            else if (command & BIT_MEM_OPER_REG)
+            {
+                usleep (TIME_SLEEP);
+                number = (sp->code)[sp->ip];
+                int tmp = 0;
+                if (DO_POP(&tmp) != 0)
+                {
+                    RETURN_ERROR(SYNTAX_ERR, "Pop from empty stack");
+                }
+                else
+                {
+                    switch (number)
+                    {
+                        case 1:
+                            number1 = sp->rax;
+                            break;
+                        case 2:
+                            number1 = sp->rbx;
+                            break;
+                        case 3:
+                            number1 = sp->rcx;
+                            break;
+                        case 4:
+                            number1 = sp->rdx;
+                            break;
+                        default:
+                            RETURN_ERROR(SYNTAX_ERR, "Incorrect name of register");
+                    }
+                    number1 /= PRECISION;
+                    if (0 <= number1 && number1 <= 100)
+                    {
+                        (sp->memory)[number1] = tmp;
+                    }
+                    else
+                    {
+                        RETURN_ERROR(SYNTAX_ERR, "Incorrect index of memory cell");
                     }
                 }
             }

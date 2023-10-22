@@ -81,6 +81,19 @@ Error parse_arg (char str[],
                   Commands_Arr* commands_struct,
                   Label_Arr* labels_struct,
                   Arg_Types* arg_type_real);
+Error parse_mem_oper_arg (char arg[],
+                          Commands_Arr* commands_struct,
+                          Arg_Types* arg_type_real);
+bool parse_register_arg (char arg[],
+                         Commands_Arr* commands_struct,
+                         Arg_Types* arg_type_real);
+bool parse_num_arg (char arg[],
+                    Commands_Arr* commands_struct,
+                    Arg_Types* arg_type_real);
+void parse_label_arg (char arg[],
+                      Commands_Arr* commands_struct,
+                      Label_Arr* labels_struct,
+                      Arg_Types* arg_type_real);
 int found_label (char arg[], Label_Arr* labels_struct);
 #ifdef TXT_BYTE_CODE
 Error print_commands_txt (const char* name_file_print,
@@ -99,6 +112,7 @@ void parse_cmd_args (int argc,
 void print_error_asm (Error error);
 void del_comment (char* str);
 void del_slash_n (char* str);
+void del_bracket (char* str);
 
 int main (int argc, char* argv[])
 {
@@ -238,8 +252,17 @@ Error parse_arg (char str[],
                  Arg_Types* arg_type_real)
 {
     double number = 0.0;
+    int number1 = 0;
     char command[MAX_COMMAND_LEN] = "";
     char arg[MAX_COMMAND_LEN] = "";
+    Error error = {};
+    if (sscanf (str, "%s [%s]", command, arg) == 2)
+    {
+        error = parse_mem_oper_arg (arg, commands_struct, arg_type_real);
+        PARSE_ERROR(error);
+        RETURN_ERROR(CORRECT, -1, "");
+    }
+
     if (sscanf (str, "%s %s", command, arg) != 2)
     {
         *arg_type_real = NO_ARG;
@@ -247,6 +270,56 @@ Error parse_arg (char str[],
         RETURN_ERROR(CORRECT, -1, "");
     }
 
+    if (parse_register_arg (arg, commands_struct, arg_type_real))
+    {
+        ;
+    }
+    else if (parse_num_arg (arg, commands_struct, arg_type_real))
+    {
+        ;
+    }
+    else
+    {
+        parse_label_arg (arg, commands_struct, labels_struct, arg_type_real);
+    }
+    (commands_struct->num_commands)++;
+    RETURN_ERROR(CORRECT, -1, "");
+}
+
+Error parse_mem_oper_arg (char arg[],
+                          Commands_Arr* commands_struct,
+                          Arg_Types* arg_type_real)
+{
+    int number = 0;
+    del_bracket (arg);
+    if ((strlen (arg) == 3) &&
+    (arg[0] == 'r' && ('a' <= arg[1] && arg[1] <= 'd') && arg[2] == 'x'))
+    {
+        (commands_struct->commands)[commands_struct->num_commands] |= BIT_MEM_OPER_REG;
+        (commands_struct->num_commands)++;
+        (commands_struct->commands)[commands_struct->num_commands] = (int) (arg[1] - 'a' + 1);
+        *arg_type_real = MEM_OPER_REG;
+    }
+    else if (sscanf (arg, "%d", &number) == 1)
+    {
+        (commands_struct->commands)[commands_struct->num_commands] |= BIT_MEM_OPER_NUM;
+        (commands_struct->num_commands)++;
+        (commands_struct->commands)[commands_struct->num_commands] = (int) number;
+        *arg_type_real = MEM_OPER_NUM;
+    }
+    else
+    {
+        RETURN_ERROR(SYNTAX_ERR, commands_struct->str_asm, "Incorrect argument.");
+    }
+    (commands_struct->num_commands)++;
+
+    RETURN_ERROR(CORRECT, -1, "");
+}
+
+bool parse_register_arg (char arg[],
+                         Commands_Arr* commands_struct,
+                         Arg_Types* arg_type_real)
+{
     if ((strlen (arg) == 3) &&
         (arg[0] == 'r' && ('a' <= arg[1] && arg[1] <= 'd') && arg[2] == 'x'))
     {
@@ -254,31 +327,50 @@ Error parse_arg (char str[],
         (commands_struct->num_commands)++;
         (commands_struct->commands)[commands_struct->num_commands] = (int) (arg[1] - 'a' + 1);
         *arg_type_real = REG_ARG;
+        return true;
     }
-    else if (sscanf (arg, "%lf", &number) == 1)
+    else
+    {
+        return false;
+    }
+}
+
+bool parse_num_arg (char arg[],
+                    Commands_Arr* commands_struct,
+                    Arg_Types* arg_type_real)
+{
+    double number = 0.0;
+    if (sscanf (arg, "%lf", &number) == 1)
     {
         (commands_struct->commands)[commands_struct->num_commands] |= BIT_IMM_CONST;
         (commands_struct->num_commands)++;
         (commands_struct->commands)[commands_struct->num_commands] = (int) (number * PRECISION);
         *arg_type_real = NUM_ARG;
+        return true;
     }
-    else //label
+    else
     {
-        int pos = -1;
-        (commands_struct->num_commands)++;
-        if ((pos = found_label (arg, labels_struct)) >= 0)
-        {
-            (commands_struct->commands)[commands_struct->num_commands] = (labels_struct->labels)[pos].num_ip;
-        }
-        else
-        {
-            (commands_struct->commands)[commands_struct->num_commands] = -1;
-            labels_struct->need_recompile = true;
-        }
-        *arg_type_real = LABEL;
+        return false;
     }
+}
+
+void parse_label_arg (char arg[],
+                      Commands_Arr* commands_struct,
+                      Label_Arr* labels_struct,
+                      Arg_Types* arg_type_real)
+{
+    int pos = -1;
     (commands_struct->num_commands)++;
-    RETURN_ERROR(CORRECT, -1, "");
+    if ((pos = found_label (arg, labels_struct)) >= 0)
+    {
+        (commands_struct->commands)[commands_struct->num_commands] = (labels_struct->labels)[pos].num_ip;
+    }
+    else
+    {
+        (commands_struct->commands)[commands_struct->num_commands] = -1;
+        labels_struct->need_recompile = true;
+    }
+    *arg_type_real = LABEL;
 }
 
 int found_label (char arg[], Label_Arr* labels_struct)
@@ -352,6 +444,18 @@ void del_slash_n (char* str)
     for (int i = 0; str[i] != '\0'; i++)
     {
         if (str[i] == '\n')
+        {
+            str[i] = '\0';
+            break;
+        }
+    }
+}
+
+void del_bracket (char* str)
+{
+    for (int i = 0; str[i] != '\0'; i++)
+    {
+        if (str[i] == ']')
         {
             str[i] = '\0';
             break;

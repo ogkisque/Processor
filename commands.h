@@ -3,24 +3,29 @@
 
 #define TXT_BYTE_CODE
 
-const int BIT_IMM_CONST = 1 << 8;
-const int BIT_REGISTER = 1 << 9;
-const char SIGNATURE[] = "MEGERA";
-const int VERSION = 3;
-const int MAX_NAME_LEN = 40;
-const int PRECISION = 100;
-const int MAX_COMMAND_LEN = 20;
-const int CODE_COMMAND_MASK = 0x00FF;
-const int NUM_OF_COMMANDS = 21;
-const int NUM_OF_LABELS = 20;
+const int BIT_IMM_CONST =               1 << 8;
+const int BIT_REGISTER =                1 << 9;
+const int BIT_MEM_OPER_NUM =            1 << 10;
+const int BIT_MEM_OPER_REG =            1 << 11;
+const char SIGNATURE[] =                "MEGERA";
+const int VERSION =                     3;
+const int MAX_NAME_LEN =                40;
+const int PRECISION =                   100;
+const int MAX_COMMAND_LEN =             20;
+const int CODE_COMMAND_MASK =           0x00FF;
+const int NUM_OF_COMMANDS =             21;
+const int NUM_OF_LABELS =               20;
+const int SIZE_MEMORY =                 100;
+const unsigned long int TIME_SLEEP =    500000;
 
 enum Arg_Types
 {
-    NO_ARG =         1 << 0,
-    NUM_ARG =        1 << 1,
-    REG_ARG =        1 << 2,
-    NUM_OR_REG_ARG = (1 << 1 | 1 << 2),
-    LABEL =          1 << 3
+    NO_ARG =        1 << 0,
+    NUM_ARG =       1 << 1,
+    REG_ARG =       1 << 2,
+    LABEL =         1 << 3,
+    MEM_OPER_NUM =  1 << 4,
+    MEM_OPER_REG =  1 << 5
 };
 
 struct File_Header
@@ -34,7 +39,7 @@ struct Command
 {
     int code;
     const char* name;
-    Arg_Types arg_type;
+    int arg_type;
 };
 
 #define DEF_CMD(name, num, args, ...) \

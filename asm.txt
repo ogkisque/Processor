@@ -1,24 +1,30 @@
 jmp main
 :discr
-pop rcx
-pop rbx
-pop rax
-push rbx
-push rbx
+pop [rcx]
+pop [rbx]
+pop [rax]
+push [rbx]
+push [rbx]
 mul
 push 4
-push rax
-push rcx
+push [rax]
+push [rcx]
 mul
 mul
 sub
-pop rax
+pop [1]
 ret
 :main
 in
 in
 in
+push 1
+pop rax
+push 2
+pop rbx
+push 3
+pop rcx
 call discr
-push rax
+push [1]
 out
 hlt
