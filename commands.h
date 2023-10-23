@@ -13,7 +13,6 @@ const int MAX_NAME_LEN =                40;
 const int PRECISION =                   100;
 const int MAX_COMMAND_LEN =             20;
 const int CODE_COMMAND_MASK =           0x00FF;
-const int NUM_OF_COMMANDS =             21;
 const int NUM_OF_LABELS =               20;
 const int SIZE_MEMORY =                 100;
 const unsigned long int TIME_SLEEP =    500000;
@@ -60,5 +59,7 @@ enum Commands
 };
 
 #undef DEF_CMD
+
+const int NUM_OF_COMMANDS = sizeof (COMMANDS_LIST) / sizeof (Command);
 
 #endif //COMMANDS_HEADER

@@ -1,111 +1,144 @@
-#include <stdio.h>
-#include <string.h>
+#include "discompiler.h"
 
-#include "commands.h"
-
-enum Errors
+int main (int argc, char* argv[])
 {
-    CORRECT =      -1,
-    OPEN_FILE_ERR = 1,
-    SYNTAX_ERR    = 2
-};
+    char file_name_read[MAX_NAME_LEN] = "";
+    char file_name_print[MAX_NAME_LEN] = "";
+    bool is_txt_file = parse_cmd_args (file_name_read, file_name_print, argc, argv);
 
-const int MAX_COMMAND_LEN = 20;
-const char* FILE_NAME_READ = "byte_code.txt";
-const char* FILE_NAME_PRINT = "asm1.txt";
+    Commands_Arr commands = {};
+    if (is_txt_file)
+        read_txt_byte_code (file_name_read, &commands);
+    else
+        read_bin_byte_code (file_name_read, &commands);
 
-Errors discompiling (const char* name_file_read, const char* name_file_print);
-void print_error (Errors error);
+    discompile (file_name_print, &commands);
 
-int main ()
-{
-    Errors error = discompiling (FILE_NAME_READ, FILE_NAME_PRINT);
-    print_error (error);
-    if (error != CORRECT)
-        return 1;
     return 0;
 }
 
-void print_error (Errors error)
+void read_bin_byte_code (char* file_name_read, Commands_Arr* commands)
 {
-    switch (error)
+    FILE* file_read = fopen (file_name_read, "r");
+
+    File_Header header = {};
+    fread (&header, sizeof (header), 1, file_read);
+
+    commands->num_commands = header.num_commands;
+    commands->commands = (int*) calloc (commands->num_commands, sizeof (int));
+    fread (commands->commands, sizeof (int), header.num_commands, file_read);
+
+    fclose (file_read);
+}
+
+#ifdef TXT_BYTE_CODE
+void read_txt_byte_code (char* file_name_read, Commands_Arr* commands)
+{
+    FILE* file_read = fopen (file_name_read, "r");
+    char str[MAX_COMMAND_LEN] = "";
+
+    File_Header header = {};
+    fscanf (file_read, "%s", header.signature);
+    fscanf (file_read, "%d", &(header.version));
+    fscanf (file_read, "%d", &(header.num_commands));
+
+    commands->num_commands = header.num_commands;
+    commands->commands = (int*) calloc (commands->num_commands, sizeof (int));
+
+    int number = 0;
+    int i = 0;
+    while (fscanf (file_read, "%d", &number) == 1)
     {
-    case OPEN_FILE_ERR:
-        printf ("Error is in opening file\n");
-        break;
-    case SYNTAX_ERR:
-        printf ("Error is in syntax\n");
-        break;
-    case CORRECT:
-        printf ("Correct discompilation\n");
-        break;
-    default:
-        break;
+        (commands->commands)[i] = number;
+        i++;
+    }
+
+    fclose (file_read);
+}
+#endif
+
+void discompile (char* file_name_print, Commands_Arr* commands)
+{
+    int command = 0;
+    char cmd_str[MAX_COMMAND_LEN] = "";
+    FILE* file_print = fopen (file_name_print, "w");
+
+    #define DEF_CMD(name, num, args, ...)                               \
+            if (((commands->commands)[i] & CODE_COMMAND_MASK) == num)   \
+            {                                                           \
+                fprintf (file_print, "%s ", #name);                     \
+                if ((commands->commands)[i] & BIT_REGISTER)             \
+                {                                                       \
+                    i++;                                                \
+                    command = (commands->commands)[i];                  \
+                    fprintf (file_print, "%c", 'r');                    \
+                    fprintf (file_print, "%c", 'a' + command - 1);      \
+                    fprintf (file_print, "%c\n", 'x');                  \
+                }                                                       \
+                else if ((commands->commands)[i] & BIT_MEM_OPER_NUM)    \
+                {                                                       \
+                    i++;                                                \
+                    command = (commands->commands)[i];                  \
+                    fprintf (file_print, "[%d]\n", command);            \
+                }                                                       \
+                else if ((commands->commands)[i] & BIT_MEM_OPER_REG)    \
+                {                                                       \
+                    i++;                                                \
+                    command = (commands->commands)[i];                  \
+                    fprintf (file_print, "[%c", 'r');                   \
+                    fprintf (file_print, "%c", 'a' + command - 1);      \
+                    fprintf (file_print, "%c]\n", 'x');                 \
+                }                                                       \
+                else if ((commands->commands)[i] & BIT_IMM_CONST)       \
+                {                                                       \
+                    i++;                                                \
+                    command = (commands->commands)[i];                  \
+                    fprintf (file_print, "%d\n", command);              \
+                }                                                       \
+                else if (args & LABEL)                                  \
+                {                                                       \
+                    i++;                                                \
+                    command = (commands->commands)[i];                  \
+                    fprintf (file_print, "%d\n", command);              \
+                }                                                       \
+                else                                                    \
+                {                                                       \
+                    fprintf (file_print, "\n");                         \
+                }                                                       \
+            }
+
+
+    for (int i = 0; i < commands->num_commands; i++)
+    {
+        #include "code_generate.h"
+    }
+    fclose (file_print);
+    #undef DEF_CMD
+}
+
+bool parse_cmd_args (char file_name_read[], char file_name_print[], int argc, char* argv[])
+{
+    if (argc < 3)
+    {
+        strcpy (file_name_read, BIN_FILE_NAME_READ_DEF);
+        strcpy (file_name_print, FILE_NAME_PRINT_DEF);
+        return false;
+    }
+    else
+    {
+        strcpy (file_name_read, argv[1]);
+        strcpy (file_name_print, argv[2]);
+        return check_type_file (file_name_read);
     }
 }
 
-Errors discompiling (const char* name_file_read, const char* name_file_print)
+bool check_type_file (char file_name_read[])
 {
-    FILE* file_read = fopen (name_file_read, "r");
-    FILE* file_print = fopen (name_file_print, "w");
-    if (!(file_read && file_print))
-        return OPEN_FILE_ERR;
+    int i = 0;
+    while (file_name_read[i] != '.')
+        i++;
 
-    int command = 0;
-    int number = 0;
-    while (true)
-    {
-        if (fscanf (file_read, "%d", &command) != 1)
-        {
-            break;
-        }
-        else
-        {
-            switch (command)
-            {
-            case HLT:
-                fprintf (file_print, "HLT\n");
-                break;
-            case OUT:
-                fprintf (file_print, "OUT\n");
-                break;
-            case IN:
-                fprintf (file_print, "IN\n");
-                break;
-            case DIV:
-                fprintf (file_print, "DIV\n");
-                break;
-            case SUB:
-                fprintf (file_print, "SUB\n");
-                break;
-            case MUL:
-                fprintf (file_print, "MUL\n");
-                break;
-            case ADD:
-                fprintf (file_print, "ADD\n");
-                break;
-            case SQRT:
-                fprintf (file_print, "SQRT\n");
-                break;
-            case SIN:
-                fprintf (file_print, "SIN\n");
-                break;
-            case COS:
-                fprintf (file_print, "COS\n");
-                break;
-            case PUSH:
-                if (fscanf (file_read, "%d", &number) != 1)
-                    return SYNTAX_ERR;
-                else
-                    fprintf (file_print, "PUSH %d\n", number);
-                break;
-            default:
-                return SYNTAX_ERR;
-                break;
-            }
-        }
-    }
-    fclose (file_read);
-    fclose (file_print);
-    return CORRECT;
+    if (strncmp (file_name_read + i + 1, "txt", 3) == 0)
+        return true;
+    return false;
 }
