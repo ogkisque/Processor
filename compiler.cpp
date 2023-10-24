@@ -4,7 +4,7 @@ int main (int argc, char* argv[])
 {
     char file_name_print[MAX_NAME_LEN] = "";
     char bin_file_name_print[MAX_NAME_LEN] = "";
-    parse_cmd_args (argc, argv, bin_file_name_print, file_name_read, file_name_print);
+    parse_cmd_args (argc, argv, bin_file_name_print, file_name_print);
 
     Commands_Arr commands_struct = {};
     Label_Arr labels_struct = {};
@@ -75,6 +75,9 @@ Error get_commands_arr (const char* name_file_read,
         (commands_struct->str_asm)++;
         del_comment (str);
         del_slash_n (str);
+        if (strcmp (str, "") == 0)
+            continue;
+
         if (str[0] == ':')
         {
             strcpy ((labels_struct->labels)[labels_struct->num_labels].name, str + 1);
@@ -139,8 +142,6 @@ Error parse_arg (char str[],
                  Label_Arr* labels_struct,
                  Arg_Types* arg_type_real)
 {
-    double number = 0.0;
-    int number1 = 0;
     char command[MAX_COMMAND_LEN] = "";
     char arg[MAX_COMMAND_LEN] = "";
     Error error = {};
@@ -286,7 +287,7 @@ Error print_commands_bin (const char* name_file_print,
     if (fwrite (header, sizeof (File_Header), 1, file_print) != 1)
         RETURN_ERROR(WRITE_FILE_ERR, -1, "Error in writing header in file.");
 
-    if (fwrite (commands_int, sizeof (int), header->num_commands, file_print) != header->num_commands)
+    if (fwrite (commands_int, sizeof (int), header->num_commands, file_print) != (size_t) header->num_commands)
         RETURN_ERROR(WRITE_FILE_ERR, -1, "Error in writing commands in file.");
 
     fclose (file_print);
@@ -368,7 +369,6 @@ Error header_ctor (File_Header* header, int num_comm)
 void parse_cmd_args (int argc,
                      char* argv[],
                      char bin_file_name_print[],
-                     char file_name_read[],
                      char file_name_print[])
 {
     if (argc < 4)

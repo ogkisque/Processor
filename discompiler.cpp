@@ -35,7 +35,6 @@ void read_bin_byte_code (char* file_name_read, Commands_Arr* commands)
 void read_txt_byte_code (char* file_name_read, Commands_Arr* commands)
 {
     FILE* file_read = fopen (file_name_read, "r");
-    char str[MAX_COMMAND_LEN] = "";
 
     File_Header header = {};
     fscanf (file_read, "%s", header.signature);
@@ -60,7 +59,6 @@ void read_txt_byte_code (char* file_name_read, Commands_Arr* commands)
 void discompile (char* file_name_print, Commands_Arr* commands)
 {
     int command = 0;
-    char cmd_str[MAX_COMMAND_LEN] = "";
     FILE* file_print = fopen (file_name_print, "w");
 
     #define DEF_CMD(name, num, args, ...)                               \
@@ -95,7 +93,7 @@ void discompile (char* file_name_print, Commands_Arr* commands)
                     command = (commands->commands)[i];                  \
                     fprintf (file_print, "%d\n", command);              \
                 }                                                       \
-                else if (args & LABEL)                                  \
+                else if ((args) & LABEL)                                \
                 {                                                       \
                     i++;                                                \
                     command = (commands->commands)[i];                  \

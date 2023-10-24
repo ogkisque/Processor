@@ -67,7 +67,7 @@ enum Errors_spu
 
 const char* FILE_NAME_READ_DEF =        "byte_code.txt";
 const char* BIN_FILE_NAME_READ_DEF =    "byte_code.bin";
-const int PI =                          3.1415926;
+const double PI =                       3.1415926;
 
 #ifdef TXT_BYTE_CODE
 Error read_txt_byte_code (char* file_name_read, Spu* sp);
@@ -76,7 +76,7 @@ Error read_bin_byte_code (char* file_name_read, Spu* sp);
 Error execute (Spu* sp);
 void print_error_spu (Spu* sp, Error error);
 Error spu_ctor (Spu* sp, int num_commands, const char* name, const char* file, const char* func, int line);
-Error spu_dtor (Spu* sp);
+Error spu_dtor (Spu** sp);
 Error spu_verify (Spu* sp);
 Error check_header (File_Header* header, Spu* sp);
 void spu_dump (Spu* sp, Error error);

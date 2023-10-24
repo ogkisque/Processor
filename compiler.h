@@ -110,7 +110,6 @@ Error header_ctor (File_Header* header, int num_comm);
 void parse_cmd_args (int argc,
                      char* argv[],
                      char bin_file_name_print[],
-                     char file_name_read[],
                      char file_name_print[]);
 void print_error_asm (Error error);
 void del_comment (char* str);

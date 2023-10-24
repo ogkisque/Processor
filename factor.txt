@@ -1,0 +1,27 @@
+jmp main
+
+:factorial
+push rbx
+push 1
+jbe if01
+push rbx
+push rax
+mul
+pop rax
+push rbx
+push 1
+sub
+pop rbx
+call factorial
+:if01
+push rax
+ret
+
+:main
+in
+pop rbx
+push 1
+pop rax
+call factorial
+out
+hlt

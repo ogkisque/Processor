@@ -57,8 +57,6 @@ Error read_txt_byte_code (char* file_name_read, Spu* sp)
     if (!file_read)
         RETURN_ERROR(OPEN_FILE_ERR, "Error of opening file\n");
 
-    char str[MAX_COMMAND_LEN] = "";
-
     File_Header header = {};
     fscanf (file_read, "%s", header.signature);
     fscanf (file_read, "%d", &(header.version));
@@ -106,7 +104,6 @@ Error execute (Spu* sp)
         RETURN_ERROR(VERIFY_ERR, "Error in verifying of spu\n");
     }
 
-    int i = 0;
     int command = 0;
     int number = 0;
     int number1 = 0;
