@@ -1,0 +1,130 @@
+jmp main
+
+:discr
+push rbx
+push rbx
+mul
+push 4
+push rax
+push rcx
+mul
+mul
+sub
+pop rdx
+ret
+
+:roots2
+push -1
+push rbx
+mul
+push rdx
+sqrt
+add
+push 2
+push rax
+mul
+div
+out
+push -1
+push rbx
+mul
+push rdx
+sqrt
+sub
+push 2
+push rax
+mul
+div
+out
+ret
+
+:root1
+push -1
+push rbx
+mul
+push 2
+push rax
+mul
+div
+out
+ret
+
+:a_0
+push -1
+push rcx
+mul
+push rbx
+div
+out
+ret
+
+:print_all
+push 65
+outc
+push 76
+outc
+push 76
+outc
+push 10
+outc
+ret
+
+:print_no
+push 78
+outc
+push 79
+outc
+push 10
+outc
+ret
+
+:main
+in
+pop rax
+in
+pop rbx
+in
+pop rcx
+push 0
+push rax
+jne a_not_0
+push 0
+push rbx
+je ab_0
+call a_0
+hlt
+
+:ab_0
+push 0
+push rcx
+je all_roots_main
+call print_no
+hlt
+
+:all_roots_main
+call print_all
+hlt
+
+:a_not_0
+call discr
+push 0
+push rdx
+je root1_main
+push 0
+push rdx
+jb roots2_main
+push 0
+push rdx
+ja no_roots_main
+
+:root1_main
+call root1
+hlt
+
+:roots2_main
+call roots2
+hlt
+
+:no_roots_main
+call print_no
+hlt
