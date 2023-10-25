@@ -80,11 +80,14 @@ Error get_commands_arr (const char* name_file_read,
 
         if (str[0] == ':')
         {
-            strcpy ((labels_struct->labels)[labels_struct->num_labels].name, str + 1);
-            (labels_struct->labels)[labels_struct->num_labels].num_ip = commands_struct->num_commands;
-            (labels_struct->num_labels)++;
-            if (labels_struct->num_labels > 20)
-                RETURN_ERROR(SYNTAX_ERR, commands_struct->str_asm, "Too many labels.");
+            if (found_label (str + 1, labels_struct) == -1)
+            {
+                strcpy ((labels_struct->labels)[labels_struct->num_labels].name, str + 1);
+                (labels_struct->labels)[labels_struct->num_labels].num_ip = commands_struct->num_commands;
+                (labels_struct->num_labels)++;
+                if (labels_struct->num_labels > 20)
+                    RETURN_ERROR(SYNTAX_ERR, commands_struct->str_asm, "Too many labels.");
+            }
             continue;
         }
 

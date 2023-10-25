@@ -288,3 +288,12 @@ DEF_CMD(ret,  20, NO_ARG,
             else
                 sp->ip = number - 1;
         })
+
+DEF_CMD(outc,  21,  NO_ARG,
+        {
+            int err1 = DO_POP(&number);
+            if (err1 != 0)
+                RETURN_ERROR(SYNTAX_ERR, "Pop from empty stack");
+            else
+                printf ("%c", (int) number / PRECISION);
+        })
