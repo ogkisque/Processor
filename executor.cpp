@@ -1,3 +1,4 @@
+#include "TXLib.h"
 #include "executor.h"
 
 int main (int argc, char* argv[])
@@ -21,7 +22,6 @@ int main (int argc, char* argv[])
 
     error = execute (&sp);
     PARSE_ERROR(&sp, error);
-
     return 0;
 }
 
@@ -108,6 +108,9 @@ Error execute (Spu* sp)
     int number = 0;
     int number1 = 0;
     double num_double = 0.0;
+    double size_window = sqrt (SIZE_MEMORY) * SIZE_PIXEL;
+    txCreateWindow (size_window, size_window);
+    txSetColor (TX_BLUE, 0);
 
     #define DEF_CMD(name, num, args, ...)   \
             case CMD_##name:                \
@@ -153,7 +156,9 @@ Error spu_ctor (Spu* sp, int num_commands, const char* name, const char* file, c
     sp->file = file;
     sp->func = func;
     sp->line = line;
-    sp->memory[SIZE_MEMORY] = {0};
+    sp->memory = (int*) calloc (SIZE_MEMORY, sizeof (int));
+    if (!sp->memory)
+        RETURN_ERROR(MEM_ALLOC_ERR_SPU, "Error in memory allocation of memory");
 
     sp->code = (int*) calloc (num_commands + 1, sizeof (int));
     if (!sp->code)
@@ -162,34 +167,36 @@ Error spu_ctor (Spu* sp, int num_commands, const char* name, const char* file, c
     RETURN_ERROR(CORRECT, "");
 }
 
-Error spu_dtor (Spu** sp)
+Error spu_dtor (Spu* sp)
 {
-    if (!sp || !(*sp))
+    if (!sp)
         RETURN_ERROR(NULL_POINTER_SPU, "Null pointer of spu");
 
-    delete_stack (&((*sp)->stk));
-    delete_stack (&((*sp)->ret_adrs));
-    (*sp)->rax = INT_MAX;
-    (*sp)->rbx = INT_MAX;
-    (*sp)->rcx = INT_MAX;
-    (*sp)->rdx = INT_MAX;
-    (*sp)->ip = -1;
-    (*sp)->num_comm = -1;
-    (*sp)->memory[SIZE_MEMORY] = {0};
-    (*sp)->name = NULL;
-    (*sp)->file = NULL;
-    (*sp)->func = NULL;
-    (*sp)->line = -1;
-    free ((*sp)->code);
-    (*sp)->code = NULL;
-    free (*sp);
-    *sp = NULL;
+    delete_stack (&(sp->stk));
+    delete_stack (&(sp->ret_adrs));
+    sp->rax = INT_MAX;
+    sp->rbx = INT_MAX;
+    sp->rcx = INT_MAX;
+    sp->rdx = INT_MAX;
+    sp->ip = -1;
+    sp->num_comm = -1;
+    free (sp->memory);
+    sp->memory = NULL;
+    sp->name = NULL;
+    sp->file = NULL;
+    sp->func = NULL;
+    sp->line = -1;
+    free (sp->code);
+    sp->code = NULL;
+    free (sp);
+    sp = NULL;
     RETURN_ERROR(CORRECT, "");
 }
 
 Error spu_verify (Spu* sp)
 {
     if (!sp)                                                                                    RETURN_ERROR(NULL_POINTER_SPU, "Null pointer of spu");
+    if (!(sp->memory))                                                                          RETURN_ERROR(NULL_POINTER_SPU, "Null pointer of memory");
     if (stack_verify (sp->stk) != 0)                                                            RETURN_ERROR(STACK_ERR, "Error with stack");
     if (stack_verify (sp->ret_adrs) != 0)                                                       RETURN_ERROR(STACK_ERR, "Error with stack of return adresses");
     if (sp->rax == INT_MAX || sp->rbx == INT_MAX || sp->rcx == INT_MAX || sp->rbx == INT_MAX)   RETURN_ERROR(RUBBISH_SPU, "Rubbish in registers");

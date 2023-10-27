@@ -42,7 +42,7 @@ struct Spu
     int         num_comm;
     int*        code;
     int         ip;
-    int         memory[100];
+    int*        memory;
 
     const char* name;
     const char* file;
@@ -76,7 +76,7 @@ Error read_bin_byte_code (char* file_name_read, Spu* sp);
 Error execute (Spu* sp);
 void print_error_spu (Spu* sp, Error error);
 Error spu_ctor (Spu* sp, int num_commands, const char* name, const char* file, const char* func, int line);
-Error spu_dtor (Spu** sp);
+Error spu_dtor (Spu* sp);
 Error spu_verify (Spu* sp);
 Error check_header (File_Header* header, Spu* sp);
 void spu_dump (Spu* sp, Error error);

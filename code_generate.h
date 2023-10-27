@@ -211,7 +211,7 @@ DEF_CMD(pop,  11, REG_ARG | MEM_OPER_NUM | MEM_OPER_REG,
                 }
                 else
                 {
-                    if (0 <= number && number <= 100)
+                    if (0 <= number && number <= SIZE_MEMORY)
                         (sp->memory)[number] = tmp;
                     else
                         RETURN_ERROR(SYNTAX_ERR, "Incorrect index of memory cell");
@@ -246,7 +246,7 @@ DEF_CMD(pop,  11, REG_ARG | MEM_OPER_NUM | MEM_OPER_REG,
                             RETURN_ERROR(SYNTAX_ERR, "Incorrect name of register");
                     }
                     number1 /= PRECISION;
-                    if (0 <= number1 && number1 <= 100)
+                    if (0 <= number1 && number1 < SIZE_MEMORY)
                     {
                         (sp->memory)[number1] = tmp;
                     }
@@ -296,4 +296,26 @@ DEF_CMD(outc,  21,  NO_ARG,
                 RETURN_ERROR(SYNTAX_ERR, "Pop from empty stack");
             else
                 printf ("%c", (int) number / PRECISION);
+        })
+
+DEF_CMD(draw,  22,  NO_ARG,
+        {
+            txClear ();
+            int size = (int) (sqrt (SIZE_MEMORY));
+            for (int i = 0; i < size; i++)
+            {
+                for (int j = 0; j < size; j++)
+                {
+                    int num = (int) ((sp->memory)[i * size + j] / PRECISION);
+                    int red =   (num & 0xFF0000) >> 16;
+                    int green = (num & 0x00FF00) >> 8;
+                    int blue =  num & 0x0000FF;
+                    //txSetFillColor (RGB (red, green, blue));
+                    /*
+                    txRectangle (j * SIZE_PIXEL, i * SIZE_PIXEL,
+                                 j * SIZE_PIXEL + SIZE_PIXEL, i * SIZE_PIXEL + SIZE_PIXEL);
+                    */
+                    txSetPixel (i, j, RGB (red, green, blue));
+                }
+            }
         })

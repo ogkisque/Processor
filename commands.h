@@ -14,8 +14,9 @@ const int PRECISION =                   100;
 const int MAX_COMMAND_LEN =             20;
 const int CODE_COMMAND_MASK =           0x00FF;
 const int NUM_OF_LABELS =               20;
-const int SIZE_MEMORY =                 100;
-const unsigned long int TIME_SLEEP =    500000;
+const int SIZE_MEMORY =                 1000000;
+const unsigned long int TIME_SLEEP =    0;
+const double SIZE_PIXEL =               0.8;
 
 enum Arg_Types
 {

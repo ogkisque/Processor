@@ -194,7 +194,7 @@ Error parse_mem_oper_arg (char arg[],
     }
     else if (sscanf (arg, "%d", &number) == 1)
     {
-        if (number < 0 || number > 99)
+        if (number < 0 || number >= SIZE_MEMORY)
             RETURN_ERROR(SYNTAX_ERR, commands_struct->str_asm, "Incorrect argument.");
 
         (commands_struct->commands)[commands_struct->num_commands] |= BIT_MEM_OPER_NUM;
